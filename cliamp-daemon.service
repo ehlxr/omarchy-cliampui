@@ -10,5 +10,33 @@ ExecStart=%h/.config/omarchy/plugins/io.github.thisisgm.cliampui/cliamp-daemon-s
 Restart=on-failure
 RestartSec=5
 
+# cliamp's log and history carry Navidrome stream URLs with the salted token, so nothing it writes is world-readable.
+UMask=0077
+# systemd bind-mounts this writable, which is what carves it out of the read-only home.
+ConfigurationDirectory=cliamp
+ConfigurationDirectoryMode=0700
+ProtectSystem=strict
+# strict leaves /home, /root and /run/user to ProtectHome, so home needs this line.
+ProtectHome=read-only
+# ProtectHome takes /run/user too, and the PipeWire socket lives there.
+ReadWritePaths=%t
+# The rate pin is read and removed here, and the panel helper creates the directory from outside this unit.
+ReadWritePaths=-%S/omarchy/cliampui
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+# Navidrome is HTTPS, so IP stays and the exotic families go.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
 [Install]
 WantedBy=graphical-session.target
