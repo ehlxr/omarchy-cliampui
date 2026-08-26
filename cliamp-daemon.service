@@ -35,7 +35,7 @@ ProtectKernelLogs=yes
 ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
-# Navidrome is HTTPS, so IP stays and the exotic families go.
+# Navidrome is HTTPS and glibc resolves names over NETLINK_ROUTE, so those three stay and the rest go.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
 [Install]

@@ -104,13 +104,13 @@ closing a terminal never stops the music. Pick a saved playlist from the panel's
 Library section and it plays with nothing else open.
 
 **The unit is sandboxed.** `cliamp-daemon.service` runs under `UMask=0077` with a
-read-only system and home, writable only in `~/.config/cliamp`, the runtime directory and
-the state directory the sample-rate pin lives in, which `systemd-analyze --user security`
-scores 3.7 rather than the 9.4 an unconstrained unit gets. Everything cliamp creates from
-then on is owner-only, including the log and the history file that carry Subsonic stream
-URLs. Files that already exist keep the mode they were created with, so an install that
-predates this runs `chmod -R go= ~/.config/cliamp` once, which keeps the directory
-traversable while clearing everyone else.
+read-only system and home, writable only in `~/.config/cliamp`, all of `$XDG_RUNTIME_DIR`
+and the state directory the sample-rate pin lives in, which `systemd-analyze --user
+security` scores 3.7 rather than the 9.4 an unconstrained unit gets. What the daemon
+creates from then on is owner-only, including the log and the history file that carry
+Subsonic stream URLs. A cliamp TUI you start in a terminal is not covered, since it
+writes the same files under your login umask, and files that already exist keep the mode
+they were created with, which is what the `chmod` in Install is for.
 
 **The library is browsed in the panel, not in a terminal.** cliamp publishes the
 current stream URL in its status, and that URL carries a salted Subsonic token, so
@@ -219,7 +219,11 @@ cliamp setup
 install -Dm644 ~/.config/omarchy/plugins/io.github.thisisgm.cliampui/cliamp-daemon.service ~/.local/share/systemd/user/cliamp-daemon.service
 systemctl --user daemon-reload
 systemctl --user enable --now cliamp-daemon.service
+chmod -R go= ~/.config/cliamp
 ```
+
+The `chmod` is the upgrade step: the unit only sets the mode of what it creates, so a
+directory cliamp made before this keeps its old modes, log and history included.
 
 `cliamp setup` is what writes your Navidrome server into `~/.config/cliamp/config.toml`.
 Without it the provider does not appear in cliamp at all, and the daemon has nothing to
