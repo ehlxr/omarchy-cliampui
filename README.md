@@ -103,6 +103,15 @@ Left click opens the panel, right click plays or pauses without opening it.
 closing a terminal never stops the music. Pick a saved playlist from the panel's
 Library section and it plays with nothing else open.
 
+**The unit is sandboxed.** `cliamp-daemon.service` runs under `UMask=0077` with a
+read-only system and home, writable only in `~/.config/cliamp`, the runtime directory and
+the state directory the sample-rate pin lives in, which `systemd-analyze --user security`
+scores 3.7 rather than the 9.4 an unconstrained unit gets. Everything cliamp creates from
+then on is owner-only, including the log and the history file that carry Subsonic stream
+URLs. Files that already exist keep the mode they were created with, so an install that
+predates this runs `chmod -R go= ~/.config/cliamp` once, which keeps the directory
+traversable while clearing everyone else.
+
 **The library is browsed in the panel, not in a terminal.** cliamp publishes the
 current stream URL in its status, and that URL carries a salted Subsonic token, so
 the panel reaches `getAlbumList2`, `getAlbum`, `getSong` and `search3` with it. Your
