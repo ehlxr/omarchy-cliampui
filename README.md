@@ -109,8 +109,9 @@ and the state directory the sample-rate pin lives in, which `systemd-analyze --u
 security` scores 3.7 rather than the 9.4 an unconstrained unit gets. What keeps the log,
 the history file and the saved playlists private is the mode of `~/.config/cliamp`
 itself: nothing inside a directory nobody else can enter is reachable whatever its own
-mode says. systemd creates that directory `0700` and the `chmod` in Install brings an
-older one to the same place. The umask is the second layer, and it covers what the daemon
+mode says. The `chmod` at the end of Install is what puts it there, since `cliamp setup`
+creates the directory before the unit ever starts, and systemd only sets that mode on a
+directory it creates itself. The umask is the second layer, and it covers what the daemon
 creates rather than what a cliamp TUI creates in a terminal under your login umask.
 
 **The library is browsed in the panel, not in a terminal.** cliamp publishes the
