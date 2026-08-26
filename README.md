@@ -111,8 +111,9 @@ the history file and the saved playlists private is the mode of `~/.config/cliam
 itself: nothing inside a directory nobody else can enter is reachable whatever its own
 mode says. The `chmod` at the end of Install is what puts it there, since `cliamp setup`
 creates the directory before the unit ever starts and systemd leaves the mode of a
-configuration directory it did not create alone. The umask is the second layer, and it covers what the daemon
-creates rather than what a cliamp TUI creates in a terminal under your login umask.
+configuration directory it did not create alone. The umask is the second layer, and it
+covers what the daemon creates rather than what a cliamp TUI creates in a terminal under
+your login umask.
 
 **The library is browsed in the panel, not in a terminal.** cliamp publishes the
 current stream URL in its status, and that URL carries a salted Subsonic token, so
