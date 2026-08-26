@@ -103,6 +103,18 @@ Left click opens the panel, right click plays or pauses without opening it.
 closing a terminal never stops the music. Pick a saved playlist from the panel's
 Library section and it plays with nothing else open.
 
+**The unit is sandboxed.** `cliamp-daemon.service` runs under `UMask=0077` with a
+read-only system and home, writable only in `~/.config/cliamp`, all of `$XDG_RUNTIME_DIR`
+and the state directory the sample-rate pin lives in, which `systemd-analyze --user
+security` scores 3.7 rather than the 9.4 an unconstrained unit gets. What keeps the log,
+the history file and the saved playlists private is the mode of `~/.config/cliamp`
+itself: nothing inside a directory nobody else can enter is reachable whatever its own
+mode says. The `chmod` at the end of Install is what puts it there, since `cliamp setup`
+creates the directory before the unit ever starts and systemd leaves the mode of a
+configuration directory it did not create alone. The umask is the second layer, and it
+covers what the daemon creates rather than what a cliamp TUI creates in a terminal under
+your login umask.
+
 **The library is browsed in the panel, not in a terminal.** cliamp publishes the
 current stream URL in its status, and that URL carries a salted Subsonic token, so
 the panel reaches `getAlbumList2`, `getAlbum`, `getSong` and `search3` with it. Your
@@ -210,7 +222,13 @@ cliamp setup
 install -Dm644 ~/.config/omarchy/plugins/io.github.thisisgm.cliampui/cliamp-daemon.service ~/.local/share/systemd/user/cliamp-daemon.service
 systemctl --user daemon-reload
 systemctl --user enable --now cliamp-daemon.service
+chmod -R go= ~/.config/cliamp
 ```
+
+The `chmod` sweeps what the unit does not: `cliamp setup` and the TUI both run under
+your login umask, and systemd sets the directory mode only when it creates the directory
+itself, so an install that predates the sandbox keeps its old modes. Run it again after a
+long TUI session if you want the files themselves owner-only rather than only unreachable.
 
 `cliamp setup` is what writes your Navidrome server into `~/.config/cliamp/config.toml`.
 Without it the provider does not appear in cliamp at all, and the daemon has nothing to
