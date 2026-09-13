@@ -120,19 +120,24 @@ Column {
         readonly property var bands: root.service ? root.service.bands : []
         readonly property int segments: 7
         readonly property real segmentGap: 1
+        readonly property int barCount: 10
+        readonly property real barGap: 3
+        // The bars fill the whole column across, not a narrow cluster on the left.
+        readonly property real barWidth: (width - barGap * (barCount - 1)) / barCount
 
         Row {
           anchors.left: parent.left
           anchors.bottom: parent.bottom
           height: parent.height
-          spacing: 3
+          width: parent.width
+          spacing: analyzer.barGap
 
           Repeater {
-            model: 10
+            model: analyzer.barCount
 
             Item {
               id: bar
-              width: 6
+              width: analyzer.barWidth
               height: analyzer.height
 
               readonly property real level: index < analyzer.bands.length ? analyzer.bands[index] : 0

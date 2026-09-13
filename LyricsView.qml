@@ -5,10 +5,10 @@ import qs.Ui
 
 // The lyric sheet, made the visual centre of the panel. cliamp serves the whole
 // track's lines with timestamps (LRC), so this draws a window of lines around the
-// line being sung: the current one large and bright with a soft accent bloom, the
-// neighbours fading by distance, and the whole list gliding to keep the active
-// line centred, the way a real player scrolls. No borders, no scrollbar, and it
-// takes no room at all on a track that has no lyrics.
+// line being sung: the current one large and bright, the neighbours fading by
+// distance, and the whole list gliding to keep the active line centred, the way a
+// real player scrolls. No background blob, no borders, no scrollbar, and it takes
+// no room at all on a track that has no lyrics.
 Item {
   id: root
 
@@ -22,7 +22,7 @@ Item {
   readonly property int activeIndex: root.service ? root.service.activeLyricIndex : -1
   readonly property string track: root.service ? root.service.lyricsTrackPath : ""
   readonly property int windowRows: 7
-  readonly property real slot: Style.space(30)
+  readonly property real slot: Style.space(28)
 
   visible: root.active
   width: parent.width
@@ -105,25 +105,13 @@ Item {
       height: root.slot
       visible: index < root.lines.length
 
-      // A soft accented bloom behind only the sung line, not a card around it.
-      Rectangle {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
-        width: parent.width * 0.66
-        height: parent.height * 0.7
-        radius: height / 2
-        color: Color.accent
-        opacity: row.currentRow ? 0.10 : 0
-        Behavior on opacity { NumberAnimation { duration: 250 } }
-      }
-
       Text {
         anchors.centerIn: parent
         width: parent.width - Style.space(32)
         text: row.entry ? String(row.entry.text || "") : ""
         color: root.foreground
         font.family: root.fontFamily
-        font.pixelSize: row.currentRow ? Style.space(17) : Style.space(12)
+        font.pixelSize: row.currentRow ? Style.space(15) : Style.space(11)
         font.bold: row.currentRow
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
