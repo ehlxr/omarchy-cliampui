@@ -72,15 +72,6 @@ function zhResults(n) {
   return Number(n) + " 个结果"
 }
 
-function enQueue(n) {
-  var v = Number(n)
-  return v === 1 ? "1 in queue" : v + " in queue"
-}
-
-function zhQueue(n) {
-  return Number(n) + " 首在队列"
-}
-
 function enTracks(n) {
   var v = Number(n)
   return v === 1 ? "1 track" : v + " tracks"
@@ -103,7 +94,6 @@ function table(key) {
     searchPlaceholder: zh ? "搜索歌曲、专辑和歌单" : "Search songs, albums and playlists",
     nothingMatched: zh ? "没有匹配结果" : "Nothing matched",
     startCliamp: zh ? "启动 cliamp" : "Start cliamp",
-    inQueue: zh ? zhQueue : enQueue,
     muted: zh ? "已静音" : "MUTED",
     matchRate: zh ? "匹配采样率" : "Match rate",
     noOutput: zh ? "无输出设备" : "No output",

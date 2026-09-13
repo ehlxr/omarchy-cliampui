@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell.Services.Pipewire
 import qs.Commons
 import qs.Ui
@@ -10,7 +11,9 @@ import "Model.js" as Model
 Column {
   id: root
 
+  property QtObject bar: null
   property var service: null
+  property var strings: ({})
   property string phrase: ""
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
@@ -176,18 +179,63 @@ Column {
         }
       }
 
-      // The line being sung, under the analyzer. cliamp resolves lyrics itself, so this
-      // draws what it already has rather than fetching anything, and it takes no room
-      // at all on a track that has none. Rendered through MarqueeText like the title,
-      // which is structurally a single clipped line whatever the text does: short lines
-      // sit still, long ones scroll, and embedded line breaks fold into spaces.
-      MarqueeText {
+      // The volume row, where the lyric used to be: label on the left, the track
+      // stretched to the percent on the right, all on one padded, outlined surface.
+      // Percent, not dB, because this is the PipeWire stream gain and not cliamp's own.
+      CursorSurface {
         width: parent.width
-        visible: root.hasTrack && root.service.activeLyric.length > 0
-        text: root.service ? String(root.service.activeLyric || "").replace(/[\r\n]+/g, " ") : ""
-        color: root.foreground
-        fontFamily: root.fontFamily
-        pixelSize: Style.font.bodySmall
+        foreground: root.foreground
+        outline: true
+        visible: !!(root.service && root.service.hasStreamVolume)
+        implicitHeight: Math.max(volumeHeader.implicitHeight, volumeValue.implicitHeight, volumeSlider.implicitHeight) + Style.spacing.rowPaddingX
+
+        RowLayout {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.leftMargin: Style.space(10)
+          anchors.rightMargin: Style.space(10)
+          spacing: Style.space(8)
+
+          PanelSectionHeader {
+            id: volumeHeader
+            text: String(root.strings.sectionVolume || "VOLUME")
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+          }
+
+          PanelSlider {
+            id: volumeSlider
+            bar: root.bar
+            Layout.fillWidth: true
+            Layout.preferredHeight: Style.space(22)
+            minimum: 0
+            maximum: 100
+            step: 1
+            value: root.service ? root.service.streamVolume * 100 : 0
+            enabled: !!(root.service && root.service.running)
+
+            onMoved: function (v) { if (root.service) root.service.setStreamVolume(v / 100) }
+            // Right click returns the stream to unity and clears mute, which is the state
+            // the verdict counts as untouched. cliamp's own gain is expected to stay at 0 dB.
+            onRightClicked: if (root.service) root.service.setStreamVolume(1)
+          }
+
+          Text {
+            id: volumeValue
+            textFormat: Text.PlainText
+            text: {
+              if (!root.service) return ""
+              if (volumeSlider.dragging) return Math.round(volumeSlider.liveValue) + "%"
+              if (root.service.streamMuted) return String(root.strings.muted || "MUTED")
+              return Math.round(root.service.streamVolume * 100) + "%"
+            }
+            color: Qt.darker(root.foreground, 1.4)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+        }
       }
     }
   }

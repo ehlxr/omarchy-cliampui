@@ -228,7 +228,9 @@ Panel {
 
           NowPlaying {
             width: parent.width
+            bar: root.bar
             service: cliamp
+            strings: root.strings
             phrase: root.heroPhraseText
             foreground: root.foreground
             fontFamily: root.fontFamily

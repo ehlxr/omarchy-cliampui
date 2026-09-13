@@ -113,79 +113,24 @@ Column {
     }
   }
 
+  // The line being sung, where the volume row used to be. cliamp resolves lyrics
+  // itself, so this draws what it already has rather than fetching anything, and it
+  // takes no room at all on a track that has none. Multi-line: long lines wrap
+  // instead of scrolling like a marquee, capped at three lines so the panel cannot
+  // grow without bound, and folded to spaces so embedded line breaks read as pauses.
   Text {
-    textFormat: Text.PlainText
-    anchors.horizontalCenter: parent.horizontalCenter
-    // MPRIS reports HasTrackList false and the IPC has no queue read, so a count is
-    // the most this panel can honestly say about what is coming next.
-    text: root.service && root.service.total > 0
-        ? (root.strings && root.strings.inQueue
-          ? root.strings.inQueue(root.service.total)
-          : root.service.total + " in queue")
-        : ""
-    color: root.dim
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    visible: text.length > 0
-  }
-
-  // Volume lives on a single row like every other section: label on the left, the
-  // track stretched between it and the percent on the right, so the whole control is
-  // one padded, outlined surface. Percent, not dB, because this is the PipeWire
-  // stream gain and not cliamp's own.
-  CursorSurface {
+    id: lyric
     width: parent.width
-    foreground: root.foreground
-    outline: true
-    visible: !!(root.service && root.service.hasStreamVolume)
-    implicitHeight: Math.max(volumeHeader.implicitHeight, volumeValue.implicitHeight, volumeSlider.implicitHeight) + Style.spacing.rowPaddingX
-
-    RowLayout {
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(10)
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(8)
-
-      PanelSectionHeader {
-        id: volumeHeader
-        text: String(root.strings.sectionVolume || "VOLUME")
-        foreground: root.foreground
-        fontFamily: root.fontFamily
-      }
-
-      PanelSlider {
-        id: volumeSlider
-        bar: root.bar
-        Layout.fillWidth: true
-        Layout.preferredHeight: Style.space(22)
-        minimum: 0
-        maximum: 100
-        step: 1
-        value: root.service ? root.service.streamVolume * 100 : 0
-        enabled: root.live
-
-        onMoved: function (v) { if (root.service) root.service.setStreamVolume(v / 100) }
-        // Right click returns the stream to unity and clears mute, which is the state
-        // the verdict counts as untouched. cliamp's own gain is expected to stay at 0 dB.
-        onRightClicked: if (root.service) root.service.setStreamVolume(1)
-      }
-
-      Text {
-        id: volumeValue
-        textFormat: Text.PlainText
-        text: {
-          if (!root.service) return ""
-          if (volumeSlider.dragging) return Math.round(volumeSlider.liveValue) + "%"
-          if (root.service.streamMuted) return String(root.strings.muted || "MUTED")
-          return Math.round(root.service.streamVolume * 100) + "%"
-        }
-        color: Qt.darker(root.foreground, 1.4)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.bold: true
-      }
-    }
+    visible: root.service
+        && root.service.hasTrack
+        && String(root.service.activeLyric || "").length > 0
+    text: root.service ? String(root.service.activeLyric || "").replace(/[\r\n]+/g, " ") : ""
+    color: root.foreground
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.bodySmall
+    wrapMode: Text.Wrap
+    maximumLineCount: 3
+    elide: Text.ElideRight
+    horizontalAlignment: Text.AlignHCenter
   }
 }
