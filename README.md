@@ -6,7 +6,8 @@ proof the audio reaching your DAC is untouched. The transport gained four exclus
 modes — sequential, shuffle, repeat-all and repeat-one — the active playlist lives in
 the panel, and lyrics resolved by cliamp itself fold under the controls. A footer
 under a hairline names the build, checks GitHub for a newer one when the version is
-clicked, and links home.
+clicked, and links home; in the same row, 退出 quits cliamp and the language label
+switches the interface between 中文 and English in place.
 
 The last one is the reason this exists. Nothing else on the machine can tell you that
 a 44.1 kHz track is being quietly resampled to 48 kHz before it reaches the speakers,
@@ -49,9 +50,12 @@ which is what PipeWire does by default to everything.
   rate while cliamp plays, and released the moment it stops.
 - **A footer that answers for itself**: a hairline sets it apart from the controls.
   The version on the left checks GitHub for updates when clicked, showing the verdict
-  in a tooltip — clicking again re-checks; the homepage link on the right opens the
-  repository. The whole interface answers in English or 中文 from the Interface
-  language setting.
+  in a tooltip — clicking again re-checks. To its right sit **退出**, which quits cliamp
+  gracefully and closes the panel (pulling the widget out of the bar too), the language
+  name that toggles the Interface language setting between 中文 and English — the label
+  shows the language the next click lands on — and the homepage link on the right that
+  opens the repository. The whole interface answers in English or 中文 from the
+  Interface language setting.
 
 ![The output sheet: the sink in use is ticked, the verdict on the left and the output to the right on one line](docs/panel-output.png)
 
@@ -97,6 +101,7 @@ back from the sink, so the panel cannot claim a route it did not get.
 | `p` | toggle rate following |
 | `/` | open the library, which puts the keyboard in the search field |
 | `f` | wake the headless cliamp daemon, only when nothing is running |
+| `q` | quit cliamp: graceful SIGTERM, so it writes its resume state |
 | `esc` | close |
 
 Opening the library or the song list hands the keyboard to its search field, and while
@@ -115,6 +120,8 @@ Left click opens the panel, right click plays or pauses without opening it.
 - `omarchy-audio-sink-availability`, part of Omarchy, used to hide outputs with
   nothing plugged into them
 - `curl`, used by the footer's update check to ask GitHub for the latest release
+- `python3`, used by `cliamp-pick-playlist` and `cliamp-resume-ipc` to read
+  `resume.json` and speak to cliamp's IPC socket
 - `ffmpeg`, used to pull an embedded album cover out of a local file when cliamp's
   status does not publish one (cliamp only fills its album-art cache from the TUI)
 
@@ -189,6 +196,19 @@ detached, which still reads the sample-rate pin the native-rate relaunch writes.
 reconnect loop notices the socket the moment the daemon owns it, and nothing here opens
 a terminal.
 
+**The player resumes where it stopped, whichever way it was started.** The Start row, the
+desktop icon and the shortcut all launch the same way: cliamp loads the playlist whose
+file contains the saved track and position — `cliamp-pick-playlist` finds it by searching
+the local playlists for the path in `resume.json`, so no playlist name is baked in — then
+a shared helper (`cliamp-resume-ipc`) waits for the IPC socket and jumps the queue to the
+saved track and position via the version 2 protocol. The same helper serves the headless
+daemon and a TUI started from a terminal, so resume behaves identically everywhere.
+
+**退出 hides the panel, and the shortcut only brings the icon back.** The bar keeps no
+empty shell while nothing is playing: 退出 asks cliamp to quit gracefully and then hides
+the widget. From a hidden bar icon the shortcut or the desktop icon restores just the icon
+without opening the panel — clicking the icon expands it again.
+
 **Lyrics are cliamp's, not this plugin's.** cliamp resolves them from embedded tags,
 then LRCLIB, then NetEase, and answers the `lyrics` operation with a job whose result is
 a list of timestamped lines. The panel submits the operation, then polls `job.get` until
@@ -237,7 +257,7 @@ plugin's own build. Clicking it asks the GitHub releases API of this repository 
 latest tag, compares it with the local build, and shows the answer in a tooltip — up to
 date, or a newer version number to click for re-check. It needs `curl` and a route to
 `api.github.com`; without either it says the check failed. The homepage link beside it
-opens the repository, and nothing in that row runs until the version is clicked.
+opens the repository, and the update check itself runs only when the version is clicked.
 
 **Bluetooth can never be bit-perfect, and that is not a Linux limitation.** A2DP
 carries SBC, AAC and similar, all lossy. AirPods offer only SBC, SBC-XQ and AAC, so

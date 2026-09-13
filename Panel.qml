@@ -70,14 +70,13 @@ Panel {
     if (cliamp.running) Util.execArgv(["pkill", "-x", "cliamp"])
   }
 
-  // 最后一行页脚的语言切换：Auto -> 中文 -> English -> Auto 循环，写的是
-  // shell.json 里本插件的 language 键（和设置面板同一个入口）。
+  // 最后一行页脚的语言切换：中英双向切换。按钮标题就是点击后要看到的那种语言，
+  // 所以中文界面显示 English、英文界面显示 中文。Auto 只作初始默认，想回到 Auto
+  // 去设置面板（language 键和设置面板同一个入口）。
   function cycleLanguage() {
-    var next = root.languageSetting === "Auto"
-      ? "中文"
-      : (root.languageSetting === "中文" ? "English" : "Auto")
     Util.execArgv(["omarchy-shell", "shell", "setBarWidget",
-      "io.github.ehlxr.cliampui", "language", JSON.stringify(next), ""])
+      "io.github.ehlxr.cliampui", "language",
+      JSON.stringify(languageKey === "zh" ? "English" : "中文"), ""])
   }
 
   function closeAndQuit() {
@@ -147,8 +146,8 @@ Panel {
   // locale is not a supported one. Localized strings reach every child through this
   // single object, and Service.verdict reads its phrase table from the same source.
   readonly property var strings: Strings.table(languageKey)
-  // 当前生效的语言名（Auto 时跟随系统地区），作为页脚切换按钮的标题。
-  readonly property string languageLabel: languageKey === "zh" ? "中文" : "English"
+  // 当前生效语言名，作为"下一个要看到的语言"显示：中文界面显示 English，反之显示 中文。
+  readonly property string languageLabel: languageKey === "zh" ? "English" : "中文"
 
   // Ten, matching the stock panels. English is the fallback carried by Strings.js so
   // every saved setting still resolves here even before any localization ships.
