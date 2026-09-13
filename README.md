@@ -122,10 +122,11 @@ playlists for the path in `resume.json`, so no playlist name is baked in — the
 and position. The same helper serves the daemon and a TUI started from a
 terminal, so resume behaves identically everywhere.
 
-**退出 hides the panel, and the shortcut only brings the icon back.** 退出 asks
-cliamp to quit gracefully and then hides the widget from the bar. From a hidden
-icon the shortcut or the desktop icon restores just the icon without reopening
-the panel — click it to expand it again.
+**退出 quits cliamp and hides the icon; the shortcut then surfaces what is
+playing.** 退出 asks cliamp to quit gracefully and hides the widget from the
+bar. From that state the shortcut or desktop icon brings the icon back and
+surfaces what is running — the TUI window when one exists, otherwise the panel
+over the headless daemon; with nothing running it starts cliamp in a terminal.
 
 **It wakes headless, not in a terminal.** cliamp allows one instance per user, so
 a second copy would be blind to the socket. The Start row and the `f` key appear
