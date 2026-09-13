@@ -1,8 +1,10 @@
 # Cliamp
 
 [cliamp](https://www.cliamp.stream/), right in the Omarchy bar: now playing with album
-art, full transport, in-panel Navidrome browsing, per-app output routing — and whether
-the audio that actually reaches your DAC is bit-perfect.
+art, in-panel Navidrome browsing, per-app output routing, and a bit-perfect signal
+verdict — proof the audio reaching your DAC is untouched. The transport gained four
+exclusive modes — sequential, shuffle, repeat-all and repeat-one — and the playlist
+lives in the panel, with the current track pinned on top.
 
 ![Cliamp panel](docs/panel-playing.png)
 
