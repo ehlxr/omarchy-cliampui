@@ -115,7 +115,7 @@ function table(key) {
     panelVersion: zh ? "版本" : "Version",
     githubLink: zh ? "主页" : "Home",
     visitGitHub: zh ? "打开 GitHub 仓库" : "Open the GitHub repository",
-    closeAndQuit: zh ? "关闭并退出" : "Close & Quit",
+    closeAndQuit: zh ? "退出" : "Quit",
     switchLanguage: zh ? "切换语言" : "Switch language",
     checkForUpdates: zh ? "检查更新" : "Check for updates",
     checkingUpdates: zh ? "正在检查更新…" : "Checking for updates…",
