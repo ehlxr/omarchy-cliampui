@@ -1,7 +1,8 @@
 # Cliamp
 
-[cliamp](https://www.cliamp.stream/) in the Omarchy bar: what is playing, where it is
-routed, and whether the audio reaching your DAC is bit-perfect.
+[cliamp](https://www.cliamp.stream/), right in the Omarchy bar: now playing with album
+art, full transport, in-panel Navidrome browsing, per-app output routing — and whether
+the audio that actually reaches your DAC is bit-perfect.
 
 ![Cliamp panel](docs/panel-playing.png)
 
@@ -11,26 +12,28 @@ which is what PipeWire does by default to everything.
 
 ## Features
 
-- **Now playing** with album art, artist and album, straight from cliamp's MPRIS
-  interface, so it costs nothing while the panel is shut.
-- **A live level meter** driven by PipeWire's own peak data, not by a second process.
+- **A signal verdict** that only says "bit-perfect" when it really is, and otherwise
+  names the specific thing in the way.
 - **Transport**: play, pause, previous and next centered, flanked by two
   mutually exclusive mode buttons per side — sequential, shuffle, repeat-all and
   repeat-one — with the active mode pill-highlighted. A scrubber hides itself for
   radio rather than pretending a stream can be seeked.
+- **Now playing** with album art, artist and album, straight from cliamp's MPRIS
+  interface, so it costs nothing while the panel is shut.
+- **The line being sung**, one line under the analyzer, resolved by cliamp and read off
+  the same socket. It is offset by the real output latency, so it lines up with what
+  you hear rather than with what has been decoded.
+- **Output routing** per application. Switching here moves cliamp's own stream and
+  leaves the system default alone, so your notifications keep going where they were.
 - **The current playlist in the panel**: the song list section shows the active
   queue directly and is keyboard driven like the library. The row being played is
   kept pinned at the top of the list, so it never scrolls out of reach while you
   pick the next track.
-- **Output routing** per application. Switching here moves cliamp's own stream and
-  leaves the system default alone, so your notifications keep going where they were.
-- **A signal verdict** that only says "bit-perfect" when it really is, and otherwise
-  names the specific thing in the way.
 - **Rate following**, on by default: the audio graph is retuned to the track's sample
   rate while cliamp plays, and released the moment it stops.
-- **The line being sung**, one line under the analyzer, resolved by cliamp and read off
-  the same socket. It is offset by the real output latency, so it lines up with what
-  you hear rather than with what has been decoded.
+- **A live level meter** driven by PipeWire's own peak data, not by a second process.
+
+![The output list open on the two devices, with the one in use ticked](docs/panel-output.png)
 
 ## The signal line
 
@@ -178,8 +181,6 @@ this application and leaves the system volume alone. cliamp itself stays at 0 dB
 attenuation alters samples wherever it is applied, so anything under 100 percent costs
 the bit-perfect verdict and the signal line says `volume applied`. Right click the
 slider to return to unity.
-
-![The output list open on the two devices, with the one in use ticked](docs/panel-output.png)
 
 **Rate following affects every application, not just cliamp.** The sample rate belongs
 to the whole audio graph. While your music plays at 44.1 kHz, a browser playing 48 kHz
