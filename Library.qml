@@ -173,6 +173,7 @@ Column {
       onCountChanged: if (root.cursorIndex >= 0) positionViewAtIndex(root.cursorIndex, ListView.Contain)
 
       delegate: CursorSurface {
+        id: row
         required property var modelData
         required property int index
 
@@ -180,6 +181,13 @@ Column {
         foreground: root.foreground
         hasCursor: index === root.cursorIndex
         implicitHeight: albumLabel.implicitHeight + Style.spacing.rowPaddingX
+
+        // The playlist the song list is currently showing reads as the picked row,
+        // so a search returning it lands on something that already looks selected.
+        readonly property bool isBrowsed: !!modelData
+          && String(modelData.kind || "") === "playlist"
+          && root.service
+          && String(modelData.name || "") === String(root.service.browsedPlaylist || "")
 
         MouseArea {
           anchors.fill: parent
@@ -200,21 +208,25 @@ Column {
             id: albumLabel
             textFormat: Text.PlainText
             Layout.fillWidth: true
-            text: (modelData.artist ? modelData.artist + " · " : "") + modelData.name
-            color: root.foreground
+            text: (row.isBrowsed ? "♪ " : "") + (modelData.artist ? modelData.artist + " · " : "") + modelData.name
+            color: row.isBrowsed ? root.foreground : root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
             elide: Text.ElideRight
+            font.bold: row.isBrowsed
           }
 
           // The kind is the load-bearing detail once one list mixes three of them.
           Text {
             textFormat: Text.PlainText
-            text: String(modelData.kind || "").toUpperCase()
-            color: root.dim
+            text: row.isBrowsed
+              ? String(root.strings.playingNow || "PLAYING") 
+              : String(modelData.kind || "").toUpperCase()
+            color: row.isBrowsed ? Color.accent : root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             font.letterSpacing: 1.2
+            font.bold: row.isBrowsed
           }
         }
       }

@@ -320,7 +320,6 @@ Item {
         if (_browsedOffset === 0) browsedTracks = parsed.tracks
         else browsedTracks = root.browsedTracks.concat(parsed.tracks)
       }
-      root.reflowBrowsedTracks()
       // Pull every remaining page so the list reads as complete rather than trailing
       // off; the loop is bounded by the total the first page reported.
       _browsedPageCount++
@@ -542,21 +541,6 @@ Item {
     root.browsedLoading = false
     browsePollTimer.stop()
     browseTimeout.stop()
-  }
-
-  // The list reads as a queue once something is playing: the row the daemon is on jumps
-  // to the top, keeping its real playlist number, and the rest follow in library order.
-  // Skipped when the song is nowhere in the list or is already first, so the status tick
-  // every poll cycle cannot churn the ListView by reassigning the array.
-  function reflowBrowsedTracks() {
-    var rows = root.browsedTracks
-    if (rows.length < 2) return
-    var playing = -1
-    for (var i = 0; i < rows.length; i++) {
-      if (Model.sameTrack(rows[i], root.status)) { playing = i; break }
-    }
-    if (playing < 1) return
-    root.browsedTracks = [rows[playing]].concat(rows.slice(0, playing), rows.slice(playing + 1))
   }
 
   function playBrowsedTrack(row) {
@@ -1222,8 +1206,6 @@ Item {
     readSourceRate()
     // Nobody reads lyrics behind a shut panel, so that half stays panel only.
     if (panelOpen) refreshLyrics()
-    // The browsed list is ordered for whoever is listening now; reorder only panel side.
-    if (panelOpen) root.reflowBrowsedTracks()
     // A load answered by pointing the queue at the row the user picked, once. This is
     // where the pendingJump is replayed because it is the single onStatusChanged this
     // component is allowed; the load job itself usually answers first, so this guard

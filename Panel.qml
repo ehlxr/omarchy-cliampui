@@ -178,7 +178,7 @@ Panel {
       // search for a track name would otherwise skip tracks and launch a terminal.
       // The dropdown's popup owns the arrow keys while it is open, so they must not
       // also drive the panel cursor.
-      blocked: library.searchFocused
+      blocked: library.searchFocused || songList.searchFocused
 
       onMoveRequested: function (dx, dy) {
         if (dy !== 0 && (root.songListOpen || root.libraryOpen || root.sheetOpen)) {
@@ -269,6 +269,8 @@ Panel {
             strings: root.strings
             onToggleRequested: { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = 0 }
             onCursorRequested: function (index) { root.cursorIndex = index }
+            onMoveRequested: function (delta) { root.moveCursor(delta) }
+            onActivateRequested: root.activateCursor()
           }
 
           OutputSheet {

@@ -91,7 +91,8 @@ function table(key) {
     sectionVolume: zh ? "音量" : "VOLUME",
     browseLibrary: zh ? "浏览音乐库" : "Browse the library",
     browseIcon: zh ? "浏览" : "Browse",
-    searchPlaceholder: zh ? "搜索歌曲、专辑和歌单" : "Search songs, albums and playlists",
+    searchPlaceholder: zh ? "搜索歌单" : "Search playlists",
+    songSearchPlaceholder: zh ? "搜索歌曲" : "Filter songs",
     nothingMatched: zh ? "没有匹配结果" : "Nothing matched",
     startCliamp: zh ? "启动 cliamp" : "Start cliamp",
     muted: zh ? "已静音" : "MUTED",
@@ -101,6 +102,7 @@ function table(key) {
     tracksCount: zh ? zhTracks : enTracks,
     playlistsEmpty: zh ? "没有找到歌单" : "No playlists found",
     pickPlaylist: zh ? "选择歌单" : "Pick a playlist",
+    playingNow: zh ? "正在播放" : "PLAYING",
     heroPhrases: zh ? ZH_PHRASES : EN_PHRASES,
     verdict: verdictPhrases(key)
   }
