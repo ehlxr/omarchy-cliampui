@@ -75,96 +75,31 @@ Column {
       spacing: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
 
-      // Title and the volume share the top line, the volume reduced to a slim
-      // strip on the right so the track name still gets the room. The volume
-      // percent only appears while dragging, which is enough feedback and keeps
-      // the header quiet.
-      RowLayout {
+      // Title and meta are one unit and stay tight. The analyzer and the volume are
+      // separate things and take the section rhythm from the column above.
+      Column {
         width: parent.width
-        spacing: Style.space(8)
+        spacing: Style.space(4)
 
-        Column {
-          Layout.fillWidth: true
-          spacing: Style.space(4)
-
-          MarqueeText {
-            width: parent.width
-            text: root.hasTrack ? root.service.title : "Cliamp"
-            color: root.foreground
-            fontFamily: root.fontFamily
-            pixelSize: Style.font.title
-            bold: true
-          }
-
-          // Styled exactly as PanelHero styles its meta line, so the hero reads as stock
-          // even though the artwork is too large for PanelHero's icon slot.
-          MarqueeText {
-            width: parent.width
-            text: (root.hasTrack ? root.metaLine : root.phrase).toUpperCase()
-            color: root.dim
-            fontFamily: root.fontFamily
-            pixelSize: Style.font.caption
-            bold: true
-            letterSpacing: 1.2
-          }
+        MarqueeText {
+          width: parent.width
+          text: root.hasTrack ? root.service.title : "Cliamp"
+          color: root.foreground
+          fontFamily: root.fontFamily
+          pixelSize: Style.font.title
+          bold: true
         }
 
-        CursorSurface {
-          foreground: root.foreground
-          outline: true
-          visible: !!(root.service && root.service.hasStreamVolume)
-          Layout.fillWidth: false
-          Layout.preferredWidth: Style.space(148)
-          implicitHeight: Math.max(volumeHeader.implicitHeight, volumeValue.implicitHeight, volumeSlider.implicitHeight) + Style.spacing.rowPaddingX
-
-          RowLayout {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.leftMargin: Style.space(8)
-            anchors.rightMargin: Style.space(8)
-            spacing: Style.space(6)
-
-            PanelSectionHeader {
-              id: volumeHeader
-              text: String(root.strings.sectionVolume || "VOLUME")
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            PanelSlider {
-              id: volumeSlider
-              bar: root.bar
-              Layout.fillWidth: true
-              Layout.preferredHeight: Style.space(22)
-              minimum: 0
-              maximum: 100
-              step: 1
-              value: root.service ? root.service.streamVolume * 100 : 0
-              enabled: !!(root.service && root.service.running)
-
-              onMoved: function (v) { if (root.service) root.service.setStreamVolume(v / 100) }
-              // Right click returns the stream to unity and clears mute, which is the state
-              // the verdict counts as untouched. cliamp's own gain is expected to stay at 0 dB.
-              onRightClicked: if (root.service) root.service.setStreamVolume(1)
-            }
-
-            Text {
-              id: volumeValue
-              textFormat: Text.PlainText
-              text: {
-                if (!root.service) return ""
-                if (volumeSlider.dragging) return Math.round(volumeSlider.liveValue) + "%"
-                if (root.service.streamMuted) return String(root.strings.muted || "MUTED")
-                return Math.round(root.service.streamVolume * 100) + "%"
-              }
-              visible: volumeSlider.dragging || !!root.service && root.service.streamMuted
-              color: Qt.darker(root.foreground, 1.4)
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-          }
+        // Styled exactly as PanelHero styles its meta line, so the hero reads as stock
+        // even though the artwork is too large for PanelHero's icon slot.
+        MarqueeText {
+          width: parent.width
+          text: (root.hasTrack ? root.metaLine : root.phrase).toUpperCase()
+          color: root.dim
+          fontFamily: root.fontFamily
+          pixelSize: Style.font.caption
+          bold: true
+          letterSpacing: 1.2
         }
       }
 
@@ -240,6 +175,65 @@ Column {
                 Behavior on y { NumberAnimation { duration: 80 } }
               }
             }
+          }
+        }
+      }
+
+      // The volume row on its own line, clear of the title: label on the left, the
+      // track stretched to the percent on the right. Percent, not dB, because this
+      // is the PipeWire stream gain and not cliamp's own.
+      CursorSurface {
+        width: parent.width
+        foreground: root.foreground
+        outline: true
+        visible: !!(root.service && root.service.hasStreamVolume)
+        implicitHeight: Math.max(volumeHeader.implicitHeight, volumeValue.implicitHeight, volumeSlider.implicitHeight) + Style.spacing.rowPaddingX
+
+        RowLayout {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.leftMargin: Style.space(10)
+          anchors.rightMargin: Style.space(10)
+          spacing: Style.space(8)
+
+          PanelSectionHeader {
+            id: volumeHeader
+            text: String(root.strings.sectionVolume || "VOLUME")
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+          }
+
+          PanelSlider {
+            id: volumeSlider
+            bar: root.bar
+            Layout.fillWidth: true
+            Layout.preferredHeight: Style.space(22)
+            minimum: 0
+            maximum: 100
+            step: 1
+            value: root.service ? root.service.streamVolume * 100 : 0
+            enabled: !!(root.service && root.service.running)
+
+            onMoved: function (v) { if (root.service) root.service.setStreamVolume(v / 100) }
+            // Right click returns the stream to unity and clears mute, which is the state
+            // the verdict counts as untouched. cliamp's own gain is expected to stay at 0 dB.
+            onRightClicked: if (root.service) root.service.setStreamVolume(1)
+          }
+
+          Text {
+            id: volumeValue
+            textFormat: Text.PlainText
+            text: {
+              if (!root.service) return ""
+              if (volumeSlider.dragging) return Math.round(volumeSlider.liveValue) + "%"
+              if (root.service.streamMuted) return String(root.strings.muted || "MUTED")
+              return Math.round(root.service.streamVolume * 100) + "%"
+            }
+            color: Qt.darker(root.foreground, 1.4)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
           }
         }
       }

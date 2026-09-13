@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import qs.Commons
 import qs.Ui
 
 // The lyric sheet, made the visual centre of the panel. cliamp serves the whole
