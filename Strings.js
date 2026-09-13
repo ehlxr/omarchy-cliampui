@@ -113,8 +113,13 @@ function table(key) {
     showLyrics: zh ? "显示歌词" : "Show lyrics",
     hideLyrics: zh ? "隐藏歌词" : "Hide lyrics",
     panelVersion: zh ? "版本" : "Version",
-    githubLink: zh ? "GitHub" : "GitHub",
+    githubLink: zh ? "主页" : "Home",
     visitGitHub: zh ? "打开 GitHub 仓库" : "Open the GitHub repository",
+    checkForUpdates: zh ? "检查更新" : "Check for updates",
+    checkingUpdates: zh ? "正在检查更新…" : "Checking for updates…",
+    updateAvailablePrefix: zh ? "发现新版本" : "New version",
+    upToDate: zh ? "已是最新版本" : "Up to date",
+    checkFailed: zh ? "检查更新失败" : "Update check failed",
     heroPhrases: zh ? ZH_PHRASES : EN_PHRASES,
     verdict: verdictPhrases(key)
   }

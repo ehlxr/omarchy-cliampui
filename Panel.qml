@@ -27,6 +27,38 @@ Panel {
   readonly property string panelVersion: "0.1.14"
   readonly property string projectUrl: "https://github.com/ehlxr/omarchy-cliampui"
 
+  // Latest checked update tip for the version click: idle, in-flight, or result.
+  property string updateTip: ""
+
+  function versionNumbers(raw) {
+    var parts = String(raw || "").replace(/^v/i, "").split(".")
+    var nums = []
+    for (var i = 0; i < parts.length; i++) {
+      var n = parseInt(parts[i], 10)
+      nums.push(isNaN(n) ? 0 : n)
+    }
+    return nums
+  }
+
+  function compareVersions(a, b) {
+    var A = versionNumbers(a)
+    var B = versionNumbers(b)
+    var len = Math.max(A.length, B.length)
+    for (var i = 0; i < len; i++) {
+      var x = i < A.length ? A[i] : 0
+      var y = i < B.length ? B[i] : 0
+      if (x !== y) return x < y ? -1 : 1
+    }
+    return 0
+  }
+
+  function checkForUpdates() {
+    updateTip = String(root.strings.checkingUpdates || "Checking for updates…")
+    updateProc.command = ["curl", "-fsSL", "--max-time", "10",
+      "https://api.github.com/repos/ehlxr/omarchy-cliampui/releases/latest"]
+    updateProc.running = true
+  }
+
   property bool sheetOpen: false
   property bool libraryOpen: false
   property bool songListOpen: false
@@ -290,26 +322,18 @@ Panel {
             onToggleRequested: { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
           }
 
+          // A hairline sets the provenance row apart from the controls above.
+          PanelSeparator {
+            width: parent.width
+            foreground: root.foreground
+          }
+
           // Provenance at the foot: the build on the left, the way home on the right.
-          // One row, out of the way of the playing controls.
+          // The version answers for updates; the homepage opens the repository.
           CursorSurface {
             width: parent.width
             foreground: root.foreground
             implicitHeight: Math.max(footerVersion.implicitHeight, footerGithub.implicitHeight) + Style.spacing.rowPaddingX
-
-            MouseArea {
-              id: footerHover
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: Util.execArgv(["xdg-open", root.projectUrl])
-            }
-
-            PanelToolTip {
-              visible: footerHover.containsMouse
-              text: String(root.strings.visitGitHub || "Open the GitHub repository")
-              fontFamily: root.fontFamily
-            }
 
             RowLayout {
               anchors.left: parent.left
@@ -330,14 +354,66 @@ Panel {
                 elide: Text.ElideRight
               }
 
+              MouseArea {
+                id: versionHover
+                anchors.fill: footerVersion
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.checkForUpdates()
+
+                PanelToolTip {
+                  visible: versionHover.containsMouse
+                  text: String(root.updateTip || root.strings.checkForUpdates || "Check for updates")
+                  fontFamily: root.fontFamily
+                }
+              }
+
               Text {
                 id: footerGithub
                 textFormat: Text.PlainText
-                text: String(root.strings.githubLink || "GitHub") + " ↗"
+                text: String(root.strings.githubLink || "Home") + " ↗"
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
                 font.underline: true
+              }
+
+              MouseArea {
+                id: githubHover
+                anchors.fill: footerGithub
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Util.execArgv(["xdg-open", root.projectUrl])
+
+                PanelToolTip {
+                  visible: githubHover.containsMouse
+                  text: String(root.strings.visitGitHub || "Open the GitHub repository")
+                  fontFamily: root.fontFamily
+                }
+              }
+            }
+          }
+
+          Process {
+            id: updateProc
+            stdout: StdioCollector {
+              waitForEnd: true
+              onStreamFinished: {
+                var raw = String(text || "").trim()
+                var latest = ""
+                try {
+                  var parsed = JSON.parse(raw)
+                  if (parsed && parsed.tag_name) latest = String(parsed.tag_name)
+                } catch (e) { latest = "" }
+                latest = String(latest || "").replace(/^v/i, "")
+                if (!latest) {
+                  root.updateTip = String(root.strings.checkFailed || "Update check failed")
+                  return
+                }
+                if (compareVersions(latest, root.panelVersion) > 0)
+                  root.updateTip = String(root.strings.updateAvailablePrefix || "New version") + " " + latest
+                else
+                  root.updateTip = String(root.strings.upToDate || "Up to date")
               }
             }
           }
