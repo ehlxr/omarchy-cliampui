@@ -11,6 +11,9 @@ Item {
   property var settings: ({})
   // The panel writes this so nothing polls while the popup is shut.
   property bool panelOpen: false
+  // Injected by Panel, which computes the interface language; verdict() reads the
+  // phrase table out of it. An empty object keeps every English sentence intact.
+  property var strings: ({})
 
   // Rate following has to notice a track change with nothing on screen, so it is the
   // second consumer of cliamp's status and keeps the poll alive on its own.
@@ -266,16 +269,24 @@ Item {
     }
   }
 
-  // The lyrics job is the one job the panel waits on: it polls job.get until the job is
-  // terminal, because a v2 operation answers with the job rather than the payload.
-  // Measured: succeeded carries the lyrics in result; a track with no lyrics fails the
-  // job with the detail "no lyrics found" instead, which is the same answer as an empty
-  // list and must not be retried for the rest of the track.
+  // One dispatcher that knows what each operation's job means, because every terminal
+  // job lands on this single hook. Lyrics, provider.tracks and load are waited on so a
+  // row pick knows when the queue actually holds the playlist; everything else is
+  // fire-and-forget like queue.play, whose acceptance is all a command needs.
+  function acceptJob(job) {
+    if (!job) return
+    var operation = String(job.operation || "")
+    if (operation === "lyrics") { root.acceptLyricsJob(job); return }
+    if (operation === "provider.tracks") { root.acceptBrowseJob(job); return }
+    if (operation === "load") { root.acceptLoadJob(job); return }
+  }
+
+  // The lyrics job is the one this panel used to wait on: it polls job.get until the
+  // job is terminal, because a v2 operation answers with the job rather than the payload.
   property string lyricsJobId: ""
   property int lyricsPollAttempts: 0
 
-  function acceptJob(job) {
-    if (!job || job.operation !== "lyrics") return
+  function acceptLyricsJob(job) {
     if (job.state === "queued" || job.state === "running") {
       if (job.id.length > 0) { lyricsJobId = job.id; lyricsPollTimer.restart() }
       return
@@ -286,6 +297,40 @@ Item {
     if (job.result.length > 0) { acceptLyrics(job.result); return }
     lyricsPendingPath = ""
     lyrics = []
+  }
+
+  // provider.tracks is an operation, so every page needs the same queued -> job.get
+  // round as lyrics. A page is only adopted when its id is the one currently expected:
+  // both reads clear _browsedJobId before sending, so a reply for the playlist we just
+  // left can never be mistaken for the current read.
+  function acceptBrowseJob(job) {
+    if (job.state === "queued" || job.state === "running") {
+      if (job.id.length > 0) { _browsedJobId = job.id; browsePollTimer.restart(); browseTimeout.restart() }
+      return
+    }
+    browsePollTimer.stop()
+    browseTimeout.stop()
+    browsedLoading = false
+    if (job.id.length === 0 || job.id !== _browsedJobId) return
+    if (_browsedPlaylist !== browsedPlaylist) { _browsedJobId = ""; return }
+    if (job.state === "succeeded") {
+      var parsed = Model.parseProviderTracks(job.result, _browsedOffset)
+      browsedTotal = parsed.total
+      if (parsed.tracks.length > 0) {
+        if (_browsedOffset === 0) browsedTracks = parsed.tracks
+        else browsedTracks = root.browsedTracks.concat(parsed.tracks)
+      }
+      root.reflowBrowsedTracks()
+      // Pull every remaining page so the list reads as complete rather than trailing
+      // off; the loop is bounded by the total the first page reported.
+      _browsedPageCount++
+      if (root.browsedTracks.length < root.browsedTotal && _browsedPageCount < root._browsedMaxPages) {
+        root.readMoreBrowsedTracks()
+        _browsedJobId = ""
+        return
+      }
+    }
+    _browsedJobId = ""
   }
 
   // One poll per interval, and a hard stop after the same window as the timeout below,
@@ -317,6 +362,248 @@ Item {
       root.lyricsJobId = ""
       lyricsPollTimer.stop()
     }
+  }
+
+  // ---- playlist loading (which playlist the queue holds) ----
+
+  // The daemon's snapshot never names the playlist it is on, so the name is only
+  // known from the loads this panel runs, or from a size match against the list.
+  property string loadedPlaylist: ""
+  // A load's job, polled once so a row pick can fire queue.play at the right instant
+  // instead of hoping a future status will make the playlist visible.
+  property string _loadJobId: ""
+  property int loadPollAttempts: 0
+  // The name the single outstanding load was asked for; the job itself carries none.
+  property string _loadPlaylist: ""
+
+  Timer {
+    id: loadPollTimer
+    interval: 400
+    repeat: true
+    onTriggered: {
+      if (root._loadJobId.length === 0 || root.loadPollAttempts >= 20) {
+        root._loadJobId = ""
+        stop()
+        return
+      }
+      root.loadPollAttempts++
+      root.sendMethod("job.get", { job_id: root._loadJobId })
+    }
+  }
+
+  Timer {
+    id: loadTimeout
+    interval: 8000
+    repeat: false
+    onTriggered: {
+      root._loadJobId = ""
+      loadPollTimer.stop()
+    }
+  }
+
+  function acceptLoadJob(job) {
+    if (job.state === "queued" || job.state === "running") {
+      if (job.id.length > 0) { _loadJobId = job.id; loadPollTimer.restart(); loadTimeout.restart() }
+      return
+    }
+    loadPollTimer.stop()
+    loadTimeout.stop()
+    _loadJobId = ""
+    if (job.state === "succeeded") {
+      root.loadedPlaylist = String(root._loadPlaylist || "")
+      // The load starts playing on its own; only a row the user double-clicked is
+      // repointed, so the queue can land on the exact index instead of track zero.
+      if (root.pendingJump && String(root.pendingJump.playlist || "") === String(root.loadedPlaylist || "")) {
+        if (root.sendOperation("queue.play", { index: root.pendingJump.index })) {
+          root.pendingJump = null
+          root.pendingJumpTimer.stop()
+          root.settleTimer.restart()
+        }
+      }
+      return
+    }
+    // A load that failed cannot reach the row the jump pointed at, so the jump has no
+    // future here: without this the pendingJump timeout would only clear it later.
+    root.pendingJump = null
+    root.pendingJumpTimer.stop()
+  }
+
+  // Learnt by size when the panel connects to an already-playing daemon: the loaded
+  // playlist's count is exactly the queue's total. Ambiguous counts leave it unknown.
+  function detectLoadedPlaylist() {
+    if (root.loadedPlaylist.length > 0) return root.loadedPlaylist
+    if (root.total <= 0 || root.playlists.length === 0) return ""
+    var found = ""
+    for (var i = 0; i < root.playlists.length; i++) {
+      if (Number(root.playlists[i].count) === root.total) {
+        if (found.length > 0) return ""
+        found = String(root.playlists[i].name || "")
+      }
+    }
+    if (found.length > 0) root.loadedPlaylist = found
+    return root.loadedPlaylist
+  }
+
+  // ---- playlist browsing (the song list) ----
+
+  property string browsedPlaylist: ""
+  property var browsedTracks: []
+  property int browsedTotal: 0
+  property bool browsedLoading: false
+  // A cross-playlist jump: {playlist, index}. Set when the row is not on the current
+  // queue, released the moment the status agrees the playlist is loaded with rows.
+  property var pendingJump: null
+  // The single provider.tracks page currently being waited on, plus the playlist and
+  // offset it was asked for, so a late page cannot land in a newer list.
+  property string _browsedJobId: ""
+  property int _browsedOffset: 0
+  property string _browsedPlaylist: ""
+  property int browsePollAttempts: 0
+  // Pages fetched for the current browsed playlist, capped so a very large playlist
+  // cannot page-fill the panel forever.
+  property int _browsedPageCount: 0
+  readonly property int _browsedMaxPages: 50
+
+  // A page is mostly a server round trip, so the poll cap is wider than lyrics'.
+  Timer {
+    id: browsePollTimer
+    interval: 400
+    repeat: true
+    onTriggered: {
+      if (root._browsedJobId.length === 0 || root.browsePollAttempts >= 20) {
+        root._browsedJobId = ""
+        root.browsedLoading = false
+        stop()
+        return
+      }
+      root.browsePollAttempts++
+      root.sendMethod("job.get", { job_id: root._browsedJobId })
+    }
+  }
+
+  Timer {
+    id: browseTimeout
+    interval: 8000
+    repeat: false
+    onTriggered: {
+      root._browsedJobId = ""
+      root.browsedLoading = false
+      browsePollTimer.stop()
+    }
+  }
+
+  Timer {
+    id: pendingJumpTimer
+    interval: 4000
+    repeat: false
+    // A load that never reports the target playlist must not leave a ghost jump for a
+    // later, unrelated status update to fire.
+    onTriggered: root.pendingJump = null
+  }
+
+  function readPlaylistTracks(name) {
+    var playlist = String(name || "")
+    root.browsedPlaylist = playlist
+    root._browsedPlaylist = playlist
+    root.browsedTracks = []
+    root.browsedTotal = 0
+    root.browsedLoading = false
+    root._browsedJobId = ""
+    root._browsedOffset = 0
+    root._browsedPageCount = 0
+    browsePollTimer.stop()
+    browseTimeout.stop()
+    if (playlist.length === 0) return
+    if (root.sendOperation("provider.tracks", { provider: "local", playlist: playlist, offset: 0, limit: 200 })) {
+      root.browsePollAttempts = 0
+      root.browsedLoading = true
+      browseTimeout.restart()
+    }
+  }
+
+  function readMoreBrowsedTracks() {
+    if (root.browsedLoading) return
+    if (root.browsedPlaylist.length === 0) return
+    if (root.browsedTracks.length >= root.browsedTotal) return
+    root._browsedOffset = root.browsedTracks.length
+    root._browsedJobId = ""
+    if (root.sendOperation("provider.tracks", { provider: "local", playlist: root.browsedPlaylist, offset: root._browsedOffset, limit: 200 })) {
+      root.browsePollAttempts = 0
+      root.browsedLoading = true
+      browseTimeout.restart()
+    }
+  }
+
+  // One row is answered twice by the socket: the op is accepted as a queued job, and
+  // the same reply's queued state comes back before any status. Only the current id is
+  // adopted, so no stale poll can land in a list that has already moved on.
+  function clearBrowseRequest() {
+    root._browsedJobId = ""
+    root.browsedLoading = false
+    browsePollTimer.stop()
+    browseTimeout.stop()
+  }
+
+  // The list reads as a queue once something is playing: the row the daemon is on jumps
+  // to the top, keeping its real playlist number, and the rest follow in library order.
+  // Skipped when the song is nowhere in the list or is already first, so the status tick
+  // every poll cycle cannot churn the ListView by reassigning the array.
+  function reflowBrowsedTracks() {
+    var rows = root.browsedTracks
+    if (rows.length < 2) return
+    var playing = -1
+    for (var i = 0; i < rows.length; i++) {
+      if (Model.sameTrack(rows[i], root.status)) { playing = i; break }
+    }
+    if (playing < 1) return
+    root.browsedTracks = [rows[playing]].concat(rows.slice(0, playing), rows.slice(playing + 1))
+  }
+
+  function playBrowsedTrack(row) {
+    if (!row) return
+    var playlist = String(root.browsedPlaylist || "")
+    if (playlist.length === 0) return
+    // Already known to hold this playlist: pointing the queue at the row is enough,
+    // and avoids load restarting from track zero for a moment. The daemon reports no
+    // playlist name, so "loaded" is the name learned from a load or a size match.
+    if (String(root.loadedPlaylist || "") === playlist && root.total > 0) {
+      root.sendOperation("queue.play", { index: row.index })
+      root.settleTimer.restart()
+      return
+    }
+    root.pendingJump = { playlist: playlist, index: row.index }
+    root.pendingJumpTimer.restart()
+    if (root.sendOperation("load", { playlist: playlist })) {
+      root._loadPlaylist = playlist
+      root.settleTimer.restart()
+      return
+    }
+    root.pendingJump = null
+    root.pendingJumpTimer.stop()
+  }
+
+  function clearPendingJump() {
+    root.pendingJump = null
+    root.pendingJumpTimer.stop()
+  }
+
+  // The first playlist the panel sees on open, or the one currently loaded, becomes the
+  // browsed one so the summary and list are never empty. Called later than the playlist
+  // fetch, since `cliamp playlist list` answers after the panel has already opened.
+  function ensureBrowsedDefault() {
+    if (root.browsedPlaylist.length > 0) return
+    if (root.detectLoadedPlaylist().length > 0) {
+      root.readPlaylistTracks(root.detectLoadedPlaylist())
+      return
+    }
+    if (root.playlists.length === 0) return
+    // Prefer a playlist that holds tracks so the list is never a bare pick hint.
+    var first = ""
+    for (var i = 0; i < root.playlists.length; i++) {
+      if (Number(root.playlists[i].count) > 0) { first = String(root.playlists[i].name || ""); break }
+    }
+    if (first.length === 0) first = String(root.playlists[0].name || "")
+    if (first.length > 0) root.readPlaylistTracks(first)
   }
 
   // A reply lost with the connection is worth asking for again, and only that case is.
@@ -360,10 +647,11 @@ Item {
       path: root.socketPath
       connected: true
 
-      // On connect ask for status at once; on drop abandon the lyrics request in flight.
+      // On connect ask for status at once; on drop abandon what it was in flight for.
       onConnectionStateChanged: {
         if (connected) { root.refreshStatus(); return }
         root.dropLyricsRequest()
+        root.clearBrowseRequest()
       }
 
       parser: SplitParser {
@@ -376,7 +664,7 @@ Item {
           // job is the only one whose result the panel waits for. A refusal is the only
           // report a command ever gets.
           if (kind === "job") { root.acceptJob(Model.jobInfo(raw)); return }
-          if (kind === "error") { root.lastError = Model.ackError(raw); return }
+          if (kind === "error") { root.lastError = Model.ackError(raw); root.clearPendingJump(); return }
           if (kind !== "status") return
           var parsed = Model.parseStatus(raw)
           root.status = parsed
@@ -485,6 +773,9 @@ Item {
     readSinkAvailability()
     readPlaylists()
     readLibrary()
+    // The song list picks its first playlist here so it is populated for the first
+    // open; cliamp playlist list answers a beat later and defaults it in its finish.
+    ensureBrowsedDefault()
   }
 
   // ---- PipeWire routing and the signal verdict ----
@@ -603,7 +894,7 @@ Item {
     requestedRate: forcedRate,
     sourceRate: sourceRate,
     lossyLink: lossyLink
-  })
+  }, root.strings.verdict)
 
   function codecFromPath(path) {
     var text = String(path || "")
@@ -751,7 +1042,13 @@ Item {
 
   function playResult(item) {
     if (!item) return
-    if (item.kind === "playlist") { loadPlaylist(String(item.name)); return }
+    if (item.kind === "playlist") {
+      // The song list below follows the Library's pick: point it at the playlist and
+      // fetch its rows first, then hand the name to the daemon to load and play.
+      root.readPlaylistTracks(String(item.name))
+      loadPlaylist(String(item.name))
+      return
+    }
     if (albumPlayProcess.running || !item.id) return
     albumPlayProcess.command = [libraryHelper,
       item.kind === "song" ? "play-song" : "play", String(item.id)]
@@ -791,6 +1088,7 @@ Item {
       onStreamFinished: {
         root.playlists = Model.parsePlaylists(text)
         root._recomputeResults()
+        root.ensureBrowsedDefault()
       }
     }
   }
@@ -802,6 +1100,7 @@ Item {
   function loadPlaylist(name) {
     if (!name) return
     if (sendOperation("load", { playlist: String(name) })) {
+      root._loadPlaylist = String(name)
       settleTimer.restart()
       return
     }
@@ -831,16 +1130,49 @@ Item {
     actionProcess.running = true
   }
 
-  function toggleShuffle() {
-    if (actionProcess.running) return
-    actionProcess.command = [cliampPath, "shuffle"]
-    actionProcess.running = true
+  // Measured against the socket: cliamp's shuffle and repeat operations ignore every
+  // parameter that might name a target state and simply toggle or cycle on each call,
+  // so a target mode is reached by advancing each channel the right number of steps
+  // from the last status the panel saw. Every step in a burst applies exactly one state
+  // change whichever order it lands in, so a burst always ends on the requested mode.
+
+  function setRepeatMode(target) {
+    var order = ["Off", "All", "One"]
+    var current = String(root.repeat || "Off")
+    var ci = order.indexOf(current); if (ci < 0) ci = 0
+    var ti = order.indexOf(target); if (ti < 0) ti = 0
+    var steps = (ti - ci + order.length) % order.length
+    for (var i = 0; i < steps; i++) root.sendOperation("repeat")
   }
 
-  function cycleRepeat() {
-    if (actionProcess.running) return
-    actionProcess.command = [cliampPath, "repeat"]
-    actionProcess.running = true
+  function setShuffleMode(wanted) {
+    if (wanted === root.shuffle) return
+    root.sendOperation("shuffle")
+  }
+
+  // The four modes are one exclusive group: selecting one clears the others, which is
+  // what the icon row in the transport shows. "sequential" means shuffle off, repeat off;
+  // the daemon's status is the only source of truth for what is selected afterwards.
+  function selectMode(mode) {
+    if (mode === "shuffle") { setRepeatMode("Off"); setShuffleMode(true) }
+    else if (mode === "repeatAll") { setShuffleMode(false); setRepeatMode("All") }
+    else if (mode === "repeatOne") { setShuffleMode(false); setRepeatMode("One") }
+    else { setShuffleMode(false); setRepeatMode("Off") }
+    settleTimer.restart()
+  }
+
+  // Keyboard mapping: s alternates sequential and shuffle; r walks the repeat side of
+  // the exclusive group, sequential -> list -> one -> sequential.
+  function selectKey(which) {
+    if (which === "shuffle") {
+      if (root.shuffle) selectMode("sequential")
+      else selectMode("shuffle")
+      return
+    }
+    var current = root.shuffle ? "shuffle" : String(root.repeat || "Off")
+    var next = (current === "shuffle" || current === "Off") ? "repeatAll"
+      : current === "All" ? "repeatOne" : "sequential"
+    selectMode(next)
   }
 
   // cliamp cannot attach to a running instance, so the helper stops the daemon for
@@ -886,9 +1218,25 @@ Item {
   // multiple times", which fails the whole Service and removes the widget from the bar.
   onStatusChanged: {
     if (!wantsStatus) return
+    root.detectLoadedPlaylist()
     readSourceRate()
     // Nobody reads lyrics behind a shut panel, so that half stays panel only.
     if (panelOpen) refreshLyrics()
+    // The browsed list is ordered for whoever is listening now; reorder only panel side.
+    if (panelOpen) root.reflowBrowsedTracks()
+    // A load answered by pointing the queue at the row the user picked, once. This is
+    // where the pendingJump is replayed because it is the single onStatusChanged this
+    // component is allowed; the load job itself usually answers first, so this guard
+    // uses the name the load reported rather than the snapshot's absent playlist field.
+    if (root.pendingJump) {
+      if (String(root.loadedPlaylist || "") === String(root.pendingJump.playlist || "") && root.total > 0) {
+        if (root.sendOperation("queue.play", { index: root.pendingJump.index })) {
+          root.pendingJump = null
+          if (root.pendingJumpTimer) root.pendingJumpTimer.stop()
+          root.settleTimer.restart()
+        }
+      }
+    }
   }
 
   // Relaunching cliamp is the only way to change its output rate, so this is gated

@@ -14,8 +14,14 @@ which is what PipeWire does by default to everything.
 - **Now playing** with album art, artist and album, straight from cliamp's MPRIS
   interface, so it costs nothing while the panel is shut.
 - **A live level meter** driven by PipeWire's own peak data, not by a second process.
-- **Transport**: play, pause, next, previous, shuffle and repeat, plus a scrubber that
-  hides itself for radio rather than pretending a stream can be seeked.
+- **Transport**: play, pause, previous and next centered, flanked by two
+  mutually exclusive mode buttons per side — sequential, shuffle, repeat-all and
+  repeat-one — with the active mode pill-highlighted. A scrubber hides itself for
+  radio rather than pretending a stream can be seeked.
+- **The current playlist in the panel**: the song list section shows the active
+  queue directly and is keyboard driven like the library. The row being played is
+  kept pinned at the top of the list, so it never scrolls out of reach while you
+  pick the next track.
 - **Output routing** per application. Switching here moves cliamp's own stream and
   leaves the system default alone, so your notifications keep going where they were.
 - **A signal verdict** that only says "bit-perfect" when it really is, and otherwise
@@ -62,8 +68,8 @@ back from the sink, so the panel cannot claim a route it did not get.
 | `j` / `k` / `up` / `down` | move the cursor when a list is open |
 | `h` / `l` / `left` / `right` | seek 5 seconds. Inert on a stream, where a seek would skip the track |
 | `o` | open and close the output list |
-| `s` | shuffle |
-| `r` | repeat |
+| `s` | toggle shuffle between the sequential and shuffle modes |
+| `r` | cycle repeat-all, repeat-one and off |
 | `p` | toggle rate following |
 | `/` | open the library, which puts the keyboard in the search field |
 | `f` | start cliamp in a terminal, only when nothing is running |

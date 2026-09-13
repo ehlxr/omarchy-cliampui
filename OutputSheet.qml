@@ -12,6 +12,7 @@ Column {
   property bool expanded: false
   // -1 means the keyboard cursor is not on this section, so no row is highlighted.
   property int cursorIndex: -1
+  property var strings: ({})
 
   signal toggleRequested()
 
@@ -25,17 +26,13 @@ Column {
     foreground: root.foreground
   }
 
-  PanelSectionHeader {
-    text: "OUTPUT"
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-  }
-
+  // The whole section head is one clickable row: label on the left, the current
+  // sink on the right beside the folding arrow, matching the other collapsible rows.
   CursorSurface {
     id: summary
     width: parent.width
     foreground: root.foreground
-    implicitHeight: summaryLabel.implicitHeight + Style.spacing.rowPaddingX
+    implicitHeight: Math.max(outputHeader.implicitHeight, summaryLabel.implicitHeight) + Style.spacing.rowPaddingX
 
     MouseArea {
       anchors.fill: parent
@@ -52,13 +49,21 @@ Column {
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(8)
 
+      PanelSectionHeader {
+        id: outputHeader
+        text: String(root.strings.sectionOutput || "OUTPUT")
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+      }
+
+      Item { Layout.fillWidth: true }
+
       Text {
         id: summaryLabel
         textFormat: Text.PlainText
-        Layout.fillWidth: true
         text: root.service && root.service.currentSinkLabel !== ""
           ? root.service.currentSinkLabel
-          : "No output"
+          : String(root.strings.noOutput || "No output")
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
@@ -132,18 +137,13 @@ Column {
     }
   }
 
-  PanelSectionHeader {
-    text: "SIGNAL"
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    visible: root.verdict.text.length > 0
-  }
-
+  // Signal names itself on the same row that carries the verdict, so every section
+  // head reads as a single line: label left, value right.
   CursorSurface {
     width: parent.width
     foreground: root.foreground
     visible: root.verdict.text.length > 0
-    implicitHeight: verdictLabel.implicitHeight + Style.spacing.rowPaddingX
+    implicitHeight: Math.max(signalHeader.implicitHeight, verdictLabel.implicitHeight) + Style.spacing.rowPaddingX
 
     RowLayout {
       anchors.left: parent.left
@@ -153,22 +153,32 @@ Column {
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(8)
 
+      PanelSectionHeader {
+        id: signalHeader
+        text: String(root.strings.sectionSignal || "SIGNAL")
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+      }
+
+      Item { Layout.fillWidth: true }
+
       Text {
         id: verdictLabel
         textFormat: Text.PlainText
-        Layout.fillWidth: true
         text: root.verdict.text
         color: root.verdict.ok ? root.foreground : root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
+        horizontalAlignment: Text.AlignRight
         // Wrapped rather than elided: the whole value of this line is the sentence
         // explaining why a route is not bit-perfect, and a cut one says nothing.
         wrapMode: Text.WordWrap
+        Layout.alignment: Qt.AlignRight
       }
 
       Text {
         textFormat: Text.PlainText
-        text: "Match rate"
+        text: String(root.strings.matchRate || "Match rate")
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption

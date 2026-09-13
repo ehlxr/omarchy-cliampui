@@ -20,6 +20,7 @@ function defaultStatus() {
     volumeDb: 0,
     total: 0,
     index: -1,
+    playlist: "",
     shuffle: false,
     repeat: "Off",
     visualizer: "",
@@ -81,6 +82,10 @@ function parseStatus(raw) {
   out.volumeDb = numberOr(snapshot.volume, 0)
   out.total = numberOr(snapshot.total, 0)
   out.index = numberOr(snapshot.index, -1)
+  // The daemon's snapshot never names the loaded playlist, so the name is tracked
+  // on the panel side (Service.loadedPlaylist); a queue built another way, or
+  // externally via the TUI, can only be identified by matching its size.
+  out.playlist = String(snapshot.playlist || "")
   out.shuffle = snapshot.shuffle === true
   out.repeat = String(snapshot.repeat || "Off")
   out.visualizer = String(snapshot.visualizer || "")
@@ -425,6 +430,74 @@ function matchPlaylists(playlists, query) {
   return out
 }
 
+// Sample input, the JSON string a succeeded provider.tracks job carries in result:
+// {"ok":true,"total":151,"tracks":[{"title":"遇见（陕西话）","artist":"韩小九",
+//  "path":"/music/1.mp3","duration_secs":125},{"title":"As Long As You Love Me",
+//  "artist":"Backstreet Boys","path":"/music/2.mp3","duration_secs":222,"index":1}]}
+// index is page-relative and omitted at zero, so the caller's page offset remakes it
+// global, which is the index queue.play wants.
+function parseProviderTracks(raw, offset) {
+  var out = { total: 0, tracks: [] }
+  var text = String(raw || "").trim()
+  if (text.length === 0) return out
+  var data = null
+  try {
+    data = JSON.parse(text)
+  } catch (e) {
+    return out
+  }
+  if (!data || data.ok !== true || !data.tracks || data.tracks.length === undefined) return out
+  out.total = numberOr(data.total, data.tracks.length)
+  var base = numberOr(offset, 0)
+  for (var i = 0; i < data.tracks.length; i++) {
+    var t = data.tracks[i]
+    if (!t || typeof t !== "object") continue
+    out.tracks.push({
+      index: base + i,
+      title: String(t.title || ""),
+      artist: String(t.artist || ""),
+      path: String(t.path || ""),
+      durationSecs: numberOr(t.duration_secs, 0)
+    })
+  }
+  return out
+}
+
+// Sample input, one query pair from a Subsonic stream URL:
+// c=cliamp&id=rrH30XR3&s=SALT&t=TOKEN&u=USER&v=1.0.0
+function queryParam(text, key) {
+  var pair = String(text || "")
+  var cut = pair.indexOf("?")
+  if (cut < 0) return ""
+  var pairs = pair.slice(cut + 1).split("&")
+  for (var i = 0; i < pairs.length; i++) {
+    var eq = pairs[i].indexOf("=")
+    if (eq < 0) continue
+    if (pairs[i].slice(0, eq) === key) return pairs[i].slice(eq + 1)
+  }
+  return ""
+}
+
+// The current row in the song list and the track status describes. Paths are equal for
+// local files; Subsonic stream URLs rotate their salted token between reads, so the id
+// is the identity there; title plus artist plus album is the last resort. Returned
+// false only when every key disagrees, so the highlight never claims a wrong match.
+function sameTrack(a, b) {
+  if (!a || !b) return false
+  var pathA = String(a.path || "")
+  var pathB = String(b.path || "")
+  if (pathA.length > 0 && pathA === pathB) return true
+  if (pathA.indexOf("/rest/stream") >= 0 && pathB.indexOf("/rest/stream") >= 0) {
+    var idA = queryParam(pathA, "id")
+    var idB = queryParam(pathB, "id")
+    if (idA.length > 0 && idA === idB) return true
+  }
+  var titleA = String(a.title || "")
+  return titleA.length > 0 && titleA === String(b.title || "")
+    && String(a.artist || "") === String(b.artist || "")
+    && String(a.album || "") === String(b.album || "")
+}
+
 function trim(text) {
   return String(text || "").replace(/^\s+/, "").replace(/\s+$/, "")
 }
@@ -439,14 +512,27 @@ function formatRate(hz) {
 }
 
 // The three conditions from the spec. "bit-perfect" is only ever said when all hold.
-function verdict(v) {
+// The optional phrases map swaps the English wording for the interface language; its
+// absence (or an empty map) keeps every sentence byte for byte what it was, which the
+// existing tests assert.
+function verdict(v, phrases) {
   var input = v || {}
   var codec = String(input.codec || "")
   var streamRate = numberOr(input.streamRate, 0)
   var sinkRate = numberOr(input.sinkRate, 0)
+  var ph = (phrases && typeof phrases === "object") ? phrases : null
+
+  // rate fills the "{rate}" slot of outputHasNo with the plain number, exactly where
+  // the English sentence used to put it.
+  function word(key, fallback, rate) {
+    if (!ph) return fallback
+    var raw = String(ph[key] || "")
+    if (raw.length === 0) return fallback
+    return rate === undefined ? raw : raw.replace("{rate}", String(rate))
+  }
 
   if (input.transcoded === true) {
-    return { ok: false, text: (codec ? codec + " · " : "") + "transcoded by server" }
+    return { ok: false, text: (codec ? codec + " · " : "") + word("transcoded", "transcoded by server") }
   }
 
   // A2DP re-encodes with SBC or AAC, both lossy, so a Bluetooth sink can never be
@@ -455,7 +541,7 @@ function verdict(v) {
   var link = String(input.lossyLink || "")
   if (link.length > 0) {
     var lead = streamRate > 0 ? formatRate(streamRate) + " · " : ""
-    return { ok: false, text: lead + link + " · lossy" }
+    return { ok: false, text: lead + link + " · " + word("lossy", "lossy") }
   }
   if (streamRate <= 0 || sinkRate <= 0) {
     return { ok: false, text: "" }
@@ -469,14 +555,14 @@ function verdict(v) {
     return {
       ok: false,
       text: formatRate(sourceRate).replace(" kHz", "") + " → " + formatRate(streamRate)
-        + " · cliamp resampled"
+        + " · " + word("cliampResampled", "cliamp resampled")
     }
   }
 
   var prefix = (codec ? codec + " " : "") + formatRate(streamRate)
   if (Math.abs(streamRate - sinkRate) > RATE_MATCH_TOLERANCE_HZ) {
     // Written as an arrow so the whole verdict stays on one line in the panel.
-    var text = formatRate(streamRate).replace(" kHz", "") + " → " + formatRate(sinkRate) + " · resampled"
+    var text = formatRate(streamRate).replace(" kHz", "") + " → " + formatRate(sinkRate) + " · " + word("resampled", "resampled")
     // A rate was forced and the sink took a different one: the 88.2 to 96 case on the
     // internal DAC, or AirPods on SBC-XQ which hold the link at 48 kHz. Only then is
     // the output the thing to blame, which the requested rate is what distinguishes
@@ -484,24 +570,27 @@ function verdict(v) {
     var requested = numberOr(input.requestedRate, 0)
     if (requested > 0 && Math.abs(requested - sinkRate) > RATE_MATCH_TOLERANCE_HZ) {
       text = formatRate(streamRate).replace(" kHz", "") + " → " + formatRate(sinkRate)
-        + " · output has no " + formatRate(requested).replace(" kHz", "")
+        + " · " + word("outputHasNo", "output has no " + formatRate(requested).replace(" kHz", ""),
+          formatRate(requested).replace(" kHz", ""))
     }
     return { ok: false, text: text }
   }
   if (input.eqFlat === false) {
-    return { ok: false, text: prefix + " · EQ applied" }
+    return { ok: false, text: prefix + " · " + word("eqApplied", "EQ applied") }
   }
   if (input.unityGain === false || input.playerUnity === false) {
     // Named only when it is known which gain moved, because the panel can correct one.
     var stage = input.playerUnity === false ? "cliamp volume"
       : input.playerUnity === true ? "output volume" : "volume"
-    return { ok: false, text: prefix + " · " + stage + " applied" }
+    var stageKey = input.playerUnity === false ? "cliampVolumeApplied"
+      : input.playerUnity === true ? "outputVolumeApplied" : "volumeApplied"
+    return { ok: false, text: prefix + " · " + word(stageKey, stage + " applied") }
   }
   // The claim needs the source rate, the gain, the EQ and the transcode flag all read.
   if (sourceRate <= 0 || input.unityGain !== true || input.eqFlat !== true || input.transcoded !== false) {
-    return { ok: false, text: prefix + " · no resampling after cliamp" }
+    return { ok: false, text: prefix + " · " + word("noResampling", "no resampling after cliamp") }
   }
-  return { ok: true, text: prefix + " · bit-perfect" }
+  return { ok: true, text: prefix + " · " + word("bitPerfect", "bit-perfect") }
 }
 
 // Quickshell reports MPRIS position and length as doubles in seconds, not microseconds.

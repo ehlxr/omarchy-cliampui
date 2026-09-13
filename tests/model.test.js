@@ -3,7 +3,7 @@
 
 const source = Deno.readTextFileSync(new URL("../Model.js", import.meta.url))
 const Model = new Function(
-  source + "; return { defaultStatus, parseStatus, rateFromNodeProps, sinkRateFromPactl, parseSinkAvailability, parsePlaylists, parseResults, matchPlaylists, messageKind, ackError, jobInfo, asBool, parseLyrics, activeLyricIndex, latencyMs, isSupportedOutputRate, parseBands, coverArtUrlFromStreamPath, transcodedFromPath, bluetoothCodecLabel, verdict, formatTime, elideError, MAX_ERROR_CHARS }"
+  source + "; return { defaultStatus, parseStatus, parseProviderTracks, queryParam, sameTrack, rateFromNodeProps, sinkRateFromPactl, parseSinkAvailability, parsePlaylists, parseResults, matchPlaylists, messageKind, ackError, jobInfo, asBool, parseLyrics, activeLyricIndex, latencyMs, isSupportedOutputRate, parseBands, coverArtUrlFromStreamPath, transcodedFromPath, bluetoothCodecLabel, verdict, formatTime, elideError, MAX_ERROR_CHARS }"
 )()
 
 let failures = 0
@@ -359,6 +359,89 @@ check("non-numeric is zero", Model.formatTime("x"), "0:00")
 check("error whitespace collapses", Model.elideError("a\n\n  b"), "a b")
 check("long error is cut", Model.elideError("x".repeat(300)).length, Model.MAX_ERROR_CHARS)
 check("empty error stays empty", Model.elideError(""), "")
+
+// A named playlist in the snapshot. playlist is omitempty in cliamp, so it appears
+// only when a named playlist is loaded; a bare queue leaves it as its empty default.
+check("a loaded playlist is read from the snapshot",
+  Model.parseStatus('{"version":2,"id":"p1","ok":true,"snapshot":{"state":"playing","playlist":"Recently Played","index":3,"total":40}}').playlist,
+  "Recently Played")
+check("no playlist means an empty string",
+  Model.parseStatus('{"version":2,"id":"p2","ok":true,"snapshot":{"state":"playing","total":1}}').playlist,
+  "")
+check("the default status starts with no playlist", Model.defaultStatus().playlist, "")
+
+// provider.tracks payloads, byte for byte from a live daemon.
+const page = '{"ok":true,"total":151,"tracks":[{"title":"遇见（陕西话）","artist":"韩小九","path":"/music/1.mp3","duration_secs":125},{"title":"As Long As You Love Me","artist":"Backstreet Boys","path":"/music/2.mp3","duration_secs":222,"index":1}]}'
+
+const parsedPage = Model.parseProviderTracks(page, 0)
+check("a page parses its total", parsedPage.total, 151)
+check("a page parses its rows", parsedPage.tracks.length, 2)
+check("the first row keeps its page offset", parsedPage.tracks[0],
+  { index: 0, title: "遇见（陕西话）", artist: "韩小九", path: "/music/1.mp3", durationSecs: 125 })
+check("the offset remakes the index global for queue.play",
+  Model.parseProviderTracks(page, 200).tracks[1].index, 201)
+check("an empty page is safe", Model.parseProviderTracks("", 0), { total: 0, tracks: [] })
+check("garbage pages yield nothing", Model.parseProviderTracks("nope", 0), { total: 0, tracks: [] })
+check("a refused page yields nothing",
+  Model.parseProviderTracks('{"ok":false,"error":"x"}', 0), { total: 0, tracks: [] })
+check("a missing result counts the rows it has",
+  Model.parseProviderTracks('{"ok":true,"tracks":[{"path":"/m/1.mp3"}]}', 0).total, 1)
+
+// The same row, compared the way the song list highlights against the status.
+const subsonicA = { title: "Billie (Loving Arms)", artist: "Fred again..", album: "Actual Life 2",
+  path: "https://music.example.com/rest/stream?c=cliamp&id=rrH30XR3&s=SALT1&t=TOKEN1&u=USER&v=1.0.0" }
+const subsonicB = { title: "Billie (Loving Arms)", artist: "Fred again..", album: "Actual Life 2",
+  path: "https://music.example.com/rest/stream?c=cliamp&id=rrH30XR3&s=SALT2&t=TOKEN2&u=USER&v=1.0.0" }
+check("two local paths are the same track", Model.sameTrack({ path: "/music/1.mp3" }, { path: "/music/1.mp3" }), true)
+check("different local paths are not", Model.sameTrack({ path: "/music/1.mp3" }, { path: "/music/2.mp3" }), false)
+check("stream tokens rotate but the id is the identity",
+  Model.sameTrack(subsonicA, subsonicB), true)
+// A page row for a stream shares its metadata with the status; only the token differs
+// after every read, which is exactly the case above. The fallback agrees on metadata,
+// so reframing the track is what makes the mismatch definitive.
+check("a re-tagged stream still matches on its metadata",
+  Model.sameTrack(subsonicA, { title: subsonicA.title, artist: subsonicA.artist, album: subsonicA.album,
+    path: subsonicA.path.replace("rrH30XR3", "OTHER") }), true)
+check("a different stream with different metadata is a different track",
+  Model.sameTrack(subsonicA, { title: "Another Song", artist: subsonicA.artist, album: subsonicA.album,
+    path: subsonicA.path.replace("rrH30XR3", "OTHER") }), false)
+check("title, artist and album agree in the end",
+  Model.sameTrack(subsonicA, { title: subsonicA.title, artist: subsonicA.artist, album: subsonicA.album, path: "" }), true)
+check("a bare metadata mismatch is not the same track",
+  Model.sameTrack(subsonicA, { title: "Something else", artist: subsonicA.artist, album: subsonicA.album, path: "" }), false)
+check("missing input is never a match", Model.sameTrack(null, subsonicA), false)
+check("the query id is read from the stream url", Model.queryParam(subsonicA.path, "id"), "rrH30XR3")
+
+// The same signals with the Chinese phrase table: every sentence keeps the structure
+// of the English reference, with the {rate} slot filled in exactly.
+const zhPhrases = { bitPerfect: "位完美", resampled: "已重采样", cliampResampled: "cliamp 已重采样", lossy: "有损",
+  transcoded: "服务器已转码", eqApplied: "已应用 EQ", cliampVolumeApplied: "cliamp 音量已调整",
+  outputVolumeApplied: "输出音量已调整", volumeApplied: "音量已调整", noResampling: "cliamp 后无重采样", outputHasNo: "输出无 {rate}" }
+
+check("no phrases leaves the English intact",
+  Model.verdict({ streamRate: 44100, sinkRate: 44100, unityGain: true, transcoded: false, codec: "FLAC" }),
+  { ok: false, text: "FLAC 44.1 kHz · no resampling after cliamp" })
+check("a bit-perfect claim translates",
+  Model.verdict({ sourceRate: 44100, streamRate: 44100, sinkRate: 44100, unityGain: true, playerUnity: true, eqFlat: true, transcoded: false, codec: "FLAC" }, zhPhrases),
+  { ok: true, text: "FLAC 44.1 kHz · 位完美" })
+check("a resample reason translates",
+  Model.verdict({ streamRate: 44100, sinkRate: 48000, unityGain: true, transcoded: false, codec: "FLAC" }, zhPhrases),
+  { ok: false, text: "44.1 → 48 kHz · 已重采样" })
+check("a substituted rate fills the slot",
+  Model.verdict({ streamRate: 88200, sinkRate: 96000, unityGain: true, transcoded: false, codec: "FLAC", requestedRate: 88200 }, zhPhrases),
+  { ok: false, text: "88.2 → 96 kHz · 输出无 88.2" })
+check("a cliamp resample translates",
+  Model.verdict({ sourceRate: 48000, streamRate: 44100, sinkRate: 44100, unityGain: true, transcoded: false, codec: "FLAC" }, zhPhrases),
+  { ok: false, text: "48 → 44.1 kHz · cliamp 已重采样" })
+check("a transcode translates",
+  Model.verdict({ streamRate: 44100, sinkRate: 44100, unityGain: true, transcoded: true, codec: "MP3" }, zhPhrases),
+  { ok: false, text: "MP3 · 服务器已转码" })
+check("an EQ reason translates",
+  Model.verdict({ streamRate: 44100, sinkRate: 44100, unityGain: true, eqFlat: false, transcoded: false, codec: "FLAC" }, zhPhrases),
+  { ok: false, text: "FLAC 44.1 kHz · 已应用 EQ" })
+check("unknown rates still say nothing, in any language",
+  Model.verdict({ streamRate: 0, sinkRate: 0, unityGain: true, transcoded: false, codec: "" }, zhPhrases),
+  { ok: false, text: "" })
 
 console.log(failures === 0 ? "all model tests passed" : failures + " failing")
 if (failures > 0) Deno.exit(1)

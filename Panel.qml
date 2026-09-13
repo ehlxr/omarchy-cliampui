@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "Strings.js" as Strings
 
 Panel {
   id: root
@@ -23,6 +24,7 @@ Panel {
 
   property bool sheetOpen: false
   property bool libraryOpen: false
+  property bool songListOpen: false
   property int phraseIndex: 0
   // Cursor rows only exist while the output sheet is open, so the arrows never land
   // on a control that is not currently on screen.
@@ -30,19 +32,31 @@ Panel {
 
   readonly property int phraseIntervalMs: 2800
 
-  // Ten, matching the stock panels.
-  readonly property var activePhrases: [
-    "Bits arriving intact",
-    "Straight off your own shelf",
-    "No middleman on this signal",
-    "Clock locked to source",
-    "Spinning up the platter",
-    "Needle in the groove",
-    "Nothing resampled here",
-    "Self-hosted and loud",
-    "Signal path is short",
-    "Whipping the terminal"
-  ]
+  // interface language. Auto follows the desktop locale; ticking one language pins it.
+  readonly property string languageSetting: String(setting("language", "Auto") || "Auto")
+  readonly property string localeName: Qt.locale() ? Qt.locale().name : ""
+  readonly property string languageKey: Strings.localeKey(localeName, languageSetting)
+  // The row for the resolved key, English when the setting pins that or the display
+  // locale is not a supported one. Localized strings reach every child through this
+  // single object, and Service.verdict reads its phrase table from the same source.
+  readonly property var strings: Strings.table(languageKey)
+
+  // Ten, matching the stock panels. English is the fallback carried by Strings.js so
+  // every saved setting still resolves here even before any localization ships.
+  readonly property var activePhrases: (root.strings && root.strings.heroPhrases)
+    ? root.strings.heroPhrases
+    : [
+      "Bits arriving intact",
+      "Straight off your own shelf",
+      "No middleman on this signal",
+      "Clock locked to source",
+      "Spinning up the platter",
+      "Needle in the groove",
+      "Nothing resampled here",
+      "Self-hosted and loud",
+      "Signal path is short",
+      "Whipping the terminal"
+    ]
   readonly property string heroPhraseText: activePhrases[phraseIndex % activePhrases.length]
 
   // Leaves the bar entirely when there is nothing to say, rather than sitting empty.
@@ -51,15 +65,26 @@ Panel {
   implicitHeight: button.implicitHeight
 
   function moveCursor(delta) {
-    var count = libraryOpen ? cliamp.results.length : cliamp.sinks.length
-    if (count === 0) return
-    cursorIndex = (cursorIndex + delta + count) % count
+    var count = root.songListOpen ? cliamp.browsedTracks.length
+      : root.libraryOpen ? cliamp.results.length
+      : cliamp.sinks.length
+    if (count === 0) { cursorIndex = -1; return }
+    // A first press from an empty cursor lands on the first row; later presses wrap.
+    var base = cursorIndex < 0 ? (delta > 0 ? -1 : 0) : cursorIndex
+    cursorIndex = (base + delta + count) % count
   }
 
   function activateCursor() {
-    var list = libraryOpen ? cliamp.results : cliamp.sinks
+    if (root.songListOpen) {
+      // The song list's Enter is the same Play that a double click means.
+      var rows = cliamp.browsedTracks
+      if (cursorIndex < 0 || cursorIndex >= rows.length) return
+      cliamp.playBrowsedTrack(rows[cursorIndex])
+      return
+    }
+    var list = root.libraryOpen ? cliamp.results : cliamp.sinks
     if (cursorIndex < 0 || cursorIndex >= list.length) return
-    if (libraryOpen) cliamp.playResult(list[cursorIndex])
+    if (root.libraryOpen) cliamp.playResult(list[cursorIndex])
     else cliamp.setDevice(String(list[cursorIndex].name || ""))
   }
 
@@ -67,10 +92,16 @@ Panel {
     id: cliamp
     settings: root.settings
     panelOpen: root.opened
+    strings: root.strings
 
     // A keystroke narrows the search under the cursor, and an index past the end
     // highlights no row while enter quietly does nothing, so it goes back to the top.
     onResultsChanged: if (root.cursorIndex >= cliamp.results.length) root.cursorIndex = 0
+    // Sinks and the browsed rows swap out as their pages land; a cursor past the new
+    // end lands on the last row rather than pointing at empty space.
+    onBrowsedTracksChanged: if (root.cursorIndex >= cliamp.browsedTracks.length) {
+      root.cursorIndex = cliamp.browsedTracks.length - 1
+    }
   }
 
   Timer {
@@ -91,14 +122,23 @@ Panel {
     function output(): string {
       root.sheetOpen = !root.sheetOpen
       root.libraryOpen = false
+      root.songListOpen = false
       root.cursorIndex = 0
       return root.sheetOpen ? "open" : "closed"
     }
     function library(): string {
       root.libraryOpen = !root.libraryOpen
       root.sheetOpen = false
+      root.songListOpen = false
       root.cursorIndex = 0
       return root.libraryOpen ? "open" : "closed"
+    }
+    function songlist(): string {
+      root.songListOpen = !root.songListOpen
+      root.sheetOpen = false
+      root.libraryOpen = false
+      root.cursorIndex = 0
+      return root.songListOpen ? "open" : "closed"
     }
   }
 
@@ -136,14 +176,19 @@ Panel {
       anchors.fill: parent
       // Every letter is forwarded to a focused editor as well as to onTextKey, so a
       // search for a track name would otherwise skip tracks and launch a terminal.
+      // The dropdown's popup owns the arrow keys while it is open, so they must not
+      // also drive the panel cursor.
       blocked: library.searchFocused
 
       onMoveRequested: function (dx, dy) {
-        if ((root.sheetOpen || root.libraryOpen) && dy !== 0) { root.moveCursor(dy); return }
+        if (dy !== 0 && (root.songListOpen || root.libraryOpen || root.sheetOpen)) {
+          root.moveCursor(dy)
+          return
+        }
         if (dx !== 0) cliamp.seekBy(dx > 0 ? root.seekStepSec : -root.seekStepSec)
       }
       onActivateRequested: {
-        if (root.sheetOpen || root.libraryOpen) root.activateCursor()
+        if (root.songListOpen || root.libraryOpen || root.sheetOpen) root.activateCursor()
         else cliamp.playPause()
       }
       onCloseRequested: root.close()
@@ -151,14 +196,15 @@ Panel {
       onTextKey: function (t) {
         var key = String(t).toLowerCase()
         // Not j, k, l, h or x: the catcher consumes those before this handler runs.
-        if (key === "o") { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.cursorIndex = 0 }
-        else if (key === "/") { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.cursorIndex = 0 }
+        if (key === "o") { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
+        else if (key === "t") { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = 0 }
+        else if (key === "/") { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
         else if (key === "f") cliamp.openPlayer()
         else if (!cliamp.running) return
         else if (key === "n") cliamp.next()
         else if (key === "b") cliamp.previous()
-        else if (key === "s") cliamp.toggleShuffle()
-        else if (key === "r") cliamp.cycleRepeat()
+        else if (key === "s") cliamp.selectKey("shuffle")
+        else if (key === "r") cliamp.selectKey("r")
         else if (key === "p") cliamp.followSourceRate ? cliamp.releaseRate() : cliamp.matchRate()
       }
 
@@ -194,6 +240,7 @@ Panel {
             service: cliamp
             foreground: root.foreground
             fontFamily: root.fontFamily
+            strings: root.strings
           }
 
           Library {
@@ -202,11 +249,25 @@ Panel {
             service: cliamp
             foreground: root.foreground
             fontFamily: root.fontFamily
+            strings: root.strings
             expanded: root.libraryOpen
             cursorIndex: root.libraryOpen ? root.cursorIndex : -1
             onMoveRequested: function (delta) { root.moveCursor(delta) }
             onActivateRequested: root.activateCursor()
-            onToggleRequested: { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.cursorIndex = 0 }
+            onToggleRequested: { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
+          }
+
+          SongList {
+            id: songList
+            width: parent.width
+            service: cliamp
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            expanded: root.songListOpen
+            cursorIndex: root.songListOpen ? root.cursorIndex : -1
+            strings: root.strings
+            onToggleRequested: { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = 0 }
+            onCursorRequested: function (index) { root.cursorIndex = index }
           }
 
           OutputSheet {
@@ -214,9 +275,10 @@ Panel {
             service: cliamp
             foreground: root.foreground
             fontFamily: root.fontFamily
+            strings: root.strings
             expanded: root.sheetOpen
             cursorIndex: root.sheetOpen ? root.cursorIndex : -1
-            onToggleRequested: { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.cursorIndex = 0 }
+            onToggleRequested: { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
           }
         }
       }
@@ -224,7 +286,7 @@ Panel {
   }
 
   onOpenedChanged: {
-    if (!opened) { sheetOpen = false; libraryOpen = false; return }
+    if (!opened) { sheetOpen = false; libraryOpen = false; songListOpen = false; return }
     if (panelFlick) panelFlick.contentY = 0
     cursorIndex = 0
     Qt.callLater(function () { keyCatcher.forceActiveFocus() })

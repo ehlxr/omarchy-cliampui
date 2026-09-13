@@ -15,6 +15,7 @@ Column {
   property string fontFamily: Style.font.family
   property bool expanded: false
   property int cursorIndex: -1
+  property var strings: ({})
 
   signal toggleRequested()
   signal moveRequested(int delta)
@@ -44,40 +45,12 @@ Column {
     foreground: root.foreground
   }
 
-  Item {
-    width: parent.width
-    implicitHeight: Math.max(libraryHeader.implicitHeight, countLabel.implicitHeight)
-
-    PanelSectionHeader {
-      id: libraryHeader
-      text: "LIBRARY"
-      foreground: root.foreground
-      fontFamily: root.fontFamily
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-    }
-
-    Text {
-      id: countLabel
-      textFormat: Text.PlainText
-      text: root.results.length > 0
-        ? root.results.length + (root.results.length === 1 ? " RESULT" : " RESULTS")
-        : ""
-      color: Qt.darker(root.foreground, 1.4)
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-      font.letterSpacing: 1.2
-      anchors.right: parent.right
-      anchors.rightMargin: Style.space(6)
-      anchors.verticalCenter: parent.verticalCenter
-    }
-  }
-
+  // The whole section head is one clickable row: label on the left, the browsed
+  // playlist on the right beside the folding arrow, matching the song list below.
   CursorSurface {
     width: parent.width
     foreground: root.foreground
-    implicitHeight: summaryLabel.implicitHeight + Style.spacing.rowPaddingX
+    implicitHeight: Math.max(libraryHeader.implicitHeight, summaryLabel.implicitHeight, resultCount.implicitHeight) + Style.spacing.rowPaddingX
 
     MouseArea {
       anchors.fill: parent
@@ -94,23 +67,48 @@ Column {
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(8)
 
+      PanelSectionHeader {
+        id: libraryHeader
+        text: String(root.strings.sectionLibrary || "LIBRARY")
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+      }
+
+      Item { Layout.fillWidth: true }
+
+      // The row names the playlist the song list below is showing, since the two
+      // sections are one linked pair; the browse strings only stand in until a pick.
       Text {
         id: summaryLabel
         textFormat: Text.PlainText
-        Layout.fillWidth: true
-        text: root.expanded ? "Browse" : "Browse the library"
+        text: {
+          var picked = root.service ? String(root.service.browsedPlaylist || "") : ""
+          if (picked.length > 0) return picked
+          return root.expanded
+            ? String(root.strings.browseIcon || "Browse")
+            : String(root.strings.browseLibrary || "Browse the library")
+        }
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
         elide: Text.ElideRight
       }
 
+      // How many rows the list below holds, the same caption the song list uses.
       Text {
+        id: resultCount
         textFormat: Text.PlainText
-        text: "/"
-        color: root.dim
+        text: root.results.length > 0
+          ? (root.strings && root.strings.results
+            ? root.strings.results(root.results.length)
+            : root.results.length + " RESULTS")
+          : ""
+        color: Qt.darker(root.foreground, 1.4)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
+        font.bold: true
+        font.letterSpacing: 1.2
+        visible: text.length > 0
       }
 
       Text {
@@ -133,7 +131,7 @@ Column {
     TextField {
       id: search
       width: parent.width
-      placeholderText: "Search songs, albums and playlists"
+      placeholderText: String(root.strings.searchPlaceholder || "Search songs, albums and playlists")
       foreground: root.foreground
       font.family: root.fontFamily
 
@@ -225,7 +223,7 @@ Column {
     Text {
       textFormat: Text.PlainText
       width: parent.width
-      text: "Nothing matched"
+      text: String(root.strings.nothingMatched || "Nothing matched")
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
@@ -262,7 +260,7 @@ Column {
         id: startLabel
         textFormat: Text.PlainText
         Layout.fillWidth: true
-        text: "Start cliamp"
+        text: String(root.strings.startCliamp || "Start cliamp")
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: Style.font.body

@@ -176,18 +176,18 @@ Column {
         }
       }
 
-      // The line being sung, under the analyzer. cliamp resolves lyrics itself, so
-      // this draws what it already has rather than fetching anything, and it takes
-      // no room at all on a track that has none.
-      Text {
-        textFormat: Text.PlainText
+      // The line being sung, under the analyzer. cliamp resolves lyrics itself, so this
+      // draws what it already has rather than fetching anything, and it takes no room
+      // at all on a track that has none. Rendered through MarqueeText like the title,
+      // which is structurally a single clipped line whatever the text does: short lines
+      // sit still, long ones scroll, and embedded line breaks fold into spaces.
+      MarqueeText {
         width: parent.width
-        visible: root.hasTrack && text.length > 0
-        text: root.service ? root.service.activeLyric : ""
+        visible: root.hasTrack && root.service.activeLyric.length > 0
+        text: root.service ? String(root.service.activeLyric || "").replace(/[\r\n]+/g, " ") : ""
         color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        elide: Text.ElideRight
+        fontFamily: root.fontFamily
+        pixelSize: Style.font.bodySmall
       }
     }
   }

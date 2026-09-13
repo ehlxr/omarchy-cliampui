@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.ehlxr.cliampui",
   "name": "Cliamp",
-  "version": "0.1.12",
+  "version": "0.1.14",
   "author": "ehlxr",
   "license": "MIT",
   "description": "Cliamp in the Omarchy bar: now playing with album art, transport, output routing, and whether the signal reaching the DAC is bit-perfect.",
@@ -24,7 +24,8 @@
       "hideWhenStopped": true,
       "cliampPath": "",
       "lyricTrimMs": 0,
-      "followNativeRate": false
+      "followNativeRate": false,
+      "language": "Auto"
     },
     "schema": [
       {
@@ -71,6 +72,18 @@
         "label": "Path to cliamp",
         "description": "Leave empty to find cliamp on PATH.",
         "defaultValue": ""
+      },
+      {
+        "key": "language",
+        "type": "enum",
+        "label": "Interface language",
+        "description": "Auto follows the system locale; ticking a language pins its strings. English is the reference set; the Chinese panel mirrors it key for key.",
+        "options": [
+          "Auto",
+          "English",
+          "中文"
+        ],
+        "defaultValue": "Auto"
       }
     ]
   }

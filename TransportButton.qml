@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import qs.Commons
 
 // The transport marks are drawn rather than typed. U+23EE, U+23ED and U+23F8 carry
 // emoji presentation, so a font stack renders them as colour glyphs that ignore the
@@ -15,6 +16,10 @@ Item {
   // The primary action sits in a filled disc, the way current players mark it.
   property bool filled: false
   property color fillColor: "transparent"
+  // Marks the active play mode with the same capsule the song list paints under the
+  // row that is playing, so the exclusive mode group reads at a glance.
+  property bool selected: false
+  property color selectedColor: Style.selectedFillFor(Color.foreground, Color.accent)
 
   signal activated()
 
@@ -24,6 +29,17 @@ Item {
 
   implicitWidth: size
   implicitHeight: size
+
+  Rectangle {
+    anchors.centerIn: parent
+    width: root.size + Style.space(4)
+    height: root.size + Style.space(4)
+    radius: height / 2
+    color: root.selectedColor
+    visible: root.selected
+    scale: mouse.pressed ? 0.94 : 1.0
+    Behavior on scale { NumberAnimation { duration: 90 } }
+  }
 
   Rectangle {
     anchors.centerIn: parent
