@@ -21,6 +21,10 @@ Panel {
     : Qt.darker(root.barForeground, 1.55)
 
   readonly property real seekStepSec: 5
+  // Bears the plugin's provenance at the foot of the panel; keep it in step with
+  // the "version" field in manifest.json.
+  readonly property string panelVersion: "0.1.14"
+  readonly property string projectUrl: "https://github.com/ehlxr/omarchy-cliampui"
 
   property bool sheetOpen: false
   property bool libraryOpen: false
@@ -283,6 +287,58 @@ Panel {
             expanded: root.sheetOpen
             cursorIndex: root.sheetOpen ? root.cursorIndex : -1
             onToggleRequested: { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
+          }
+
+          // Provenance at the foot: the build on the left, the way home on the right.
+          // One row, out of the way of the playing controls.
+          CursorSurface {
+            width: parent.width
+            foreground: root.foreground
+            implicitHeight: Math.max(footerVersion.implicitHeight, footerGithub.implicitHeight) + Style.spacing.rowPaddingX
+
+            MouseArea {
+              id: footerHover
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: Util.execArgv(["xdg-open", root.projectUrl])
+            }
+
+            PanelToolTip {
+              visible: footerHover.containsMouse
+              text: String(root.strings.visitGitHub || "Open the GitHub repository")
+              fontFamily: root.fontFamily
+            }
+
+            RowLayout {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.leftMargin: Style.space(10)
+              anchors.rightMargin: Style.space(10)
+              spacing: Style.space(8)
+
+              Text {
+                id: footerVersion
+                textFormat: Text.PlainText
+                Layout.fillWidth: true
+                text: String(root.strings.panelVersion || "Version") + " " + root.panelVersion
+                color: Qt.darker(root.foreground, 1.5)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                elide: Text.ElideRight
+              }
+
+              Text {
+                id: footerGithub
+                textFormat: Text.PlainText
+                text: String(root.strings.githubLink || "GitHub") + " ↗"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.underline: true
+              }
+            }
           }
         }
       }

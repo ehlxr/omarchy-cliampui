@@ -112,6 +112,9 @@ function table(key) {
     toggleNext: zh ? "下一首" : "Next",
     showLyrics: zh ? "显示歌词" : "Show lyrics",
     hideLyrics: zh ? "隐藏歌词" : "Hide lyrics",
+    panelVersion: zh ? "版本" : "Version",
+    githubLink: zh ? "GitHub" : "GitHub",
+    visitGitHub: zh ? "打开 GitHub 仓库" : "Open the GitHub repository",
     heroPhrases: zh ? ZH_PHRASES : EN_PHRASES,
     verdict: verdictPhrases(key)
   }
