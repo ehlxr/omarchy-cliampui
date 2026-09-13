@@ -7,7 +7,7 @@ track is quietly resampled to 48 kHz by default. Forked from
 [thisisgm/omarchy-cliampui](https://github.com/thisisgm/omarchy-cliampui); the
 differences are summarised under [This is a fork](#this-is-a-fork).
 
-![Cliamp panel](docs/panel-playing.png)
+![Cliamp panel](docs/cliampui.gif)
 
 ## Features
 
