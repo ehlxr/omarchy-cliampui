@@ -211,7 +211,7 @@ systemctl --user restart pipewire
 
 ```bash
 omarchy plugin add https://github.com/ehlxr/omarchy-cliampui --enable
-omarchy bar put io.github.thisisgm.cliampui --section right
+omarchy bar put io.github.ehlxr.cliampui --section right
 ```
 
 `omarchy plugin add` is what keeps `omarchy plugin update` able to manage the copy
@@ -221,7 +221,7 @@ Then, once, point cliamp at your library and start the daemon:
 
 ```bash
 cliamp setup
-install -Dm644 ~/.config/omarchy/plugins/io.github.thisisgm.cliampui/cliamp-daemon.service ~/.local/share/systemd/user/cliamp-daemon.service
+install -Dm644 ~/.config/omarchy/plugins/io.github.ehlxr.cliampui/cliamp-daemon.service ~/.local/share/systemd/user/cliamp-daemon.service
 systemctl --user daemon-reload
 systemctl --user enable --now cliamp-daemon.service
 chmod -R go= ~/.config/cliamp
@@ -243,7 +243,7 @@ systemctl --user disable --now cliamp-daemon.service
 rm -f ~/.local/share/systemd/user/cliamp-daemon.service
 cliamp playlist delete cliampui
 rm -rf ~/.local/state/omarchy/cliampui
-omarchy plugin remove io.github.thisisgm.cliampui
+omarchy plugin remove io.github.ehlxr.cliampui
 ```
 
 `cliampui` is the scratch playlist the panel overwrites on every play, and its resolved

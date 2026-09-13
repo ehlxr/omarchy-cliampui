@@ -8,7 +8,7 @@ import "Model.js" as Model
 
 Panel {
   id: root
-  moduleName: "io.github.thisisgm.cliampui"
+  moduleName: "io.github.ehlxr.cliampui"
   ipcTarget: "cliampui"
   manageIpc: false
 
