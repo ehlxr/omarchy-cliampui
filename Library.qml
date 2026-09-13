@@ -180,6 +180,7 @@ Column {
         width: albumList.width
         foreground: root.foreground
         hasCursor: index === root.cursorIndex
+        current: row.isBrowsed
         implicitHeight: albumLabel.implicitHeight + Style.spacing.rowPaddingX
 
         // The playlist the song list is currently showing reads as the picked row,

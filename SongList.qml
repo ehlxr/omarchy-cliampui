@@ -60,6 +60,29 @@ Column {
 
   readonly property string stringsHead: String(root.strings.sectionPlaylists || "PLAYLISTS")
 
+  // Watching the status snapshot itself: it is a fresh object every poll tick, but
+  // changing to another song only scrolls when the row it answers for actually moves.
+  readonly property var status: service ? service.status : null
+  property string _trackKey: ""
+
+  function maybeScrollOnSwitch() {
+    if (!root.expanded) return
+    var real = root.realIndexOfCurrent()
+    if (real < 0) return
+    var t = root.tracks[real] || {}
+    var key = real + "|" + String(t.title || "") + "|" + String(t.durationSecs || 0)
+    if (key === root._trackKey) return
+    root._trackKey = key
+    root.scrollToCurrent()
+  }
+
+  onStatusChanged: root.maybeScrollOnSwitch()
+
+  onFilterQueryChanged: {
+    root._trackKey = ""
+    root.scrollToCurrent()
+  }
+
   // Keeps the cursor row on screen without ListView owning the cursor.
   onCursorIndexChanged: if (cursorIndex >= 0) revealReal(cursorIndex)
 
@@ -127,8 +150,6 @@ Column {
     var fi = root.filteredIndexForReal(root._pendingReal)
     if (fi >= 0) trackList.positionViewAtIndex(fi, ListView.Center)
   }
-
-  onFilterQueryChanged: root.scrollToCurrent()
 
   spacing: Style.space(8)
 
@@ -257,9 +278,10 @@ Column {
         width: trackList.width
         foreground: root.foreground
         hasCursor: modelData.real === root.cursorIndex
+        current: row.isLive
         implicitHeight: Math.max(titleLabel.implicitHeight, metaLabel.implicitHeight) + Style.spacing.rowPaddingX
 
-        readonly property bool current: root.service && Model.sameTrack(modelData.row, root.service.status)
+        readonly property bool isLive: root.service && Model.sameTrack(modelData.row, root.service.status)
 
         // A click parks the panel cursor on the row; a double click plays it.
         MouseArea {
@@ -283,7 +305,7 @@ Column {
             id: numberLabel
             textFormat: Text.PlainText
             text: String(typeof modelData.row.index === "number" ? modelData.row.index + 1 : modelData.real + 1)
-            color: row.current ? root.foreground : root.dim
+            color: row.isLive ? root.foreground : root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
@@ -292,8 +314,8 @@ Column {
             id: titleLabel
             textFormat: Text.PlainText
             Layout.fillWidth: true
-            text: (row.current ? "♪ " : "") + String(modelData.row.title || "")
-            color: row.current ? root.foreground : (modelData.real === root.cursorIndex ? root.foreground : root.dim)
+            text: (row.isLive ? "♪ " : "") + String(modelData.row.title || "")
+            color: row.isLive ? root.foreground : (modelData.real === root.cursorIndex ? root.foreground : root.dim)
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
             elide: Text.ElideRight

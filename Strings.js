@@ -92,7 +92,7 @@ function table(key) {
     browseLibrary: zh ? "浏览音乐库" : "Browse the library",
     browseIcon: zh ? "浏览" : "Browse",
     searchPlaceholder: zh ? "搜索歌单" : "Search playlists",
-    songSearchPlaceholder: zh ? "搜索歌曲" : "Filter songs",
+    songSearchPlaceholder: zh ? "搜索歌名或歌手" : "Filter by title or artist",
     nothingMatched: zh ? "没有匹配结果" : "Nothing matched",
     startCliamp: zh ? "启动 cliamp" : "Start cliamp",
     muted: zh ? "已静音" : "MUTED",
