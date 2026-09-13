@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# cliamp-resume-ipc: after a cliamp has been launched (TUI or headless), wait for
+# its IPC socket and continue the saved track + position. Shared by cliamp-resume
+# (terminal path) and cliamp-daemon-start (headless/panel path) so both live by
+# the same resume rules.
+#
+# cliamp only seeks to resume.json when the matching track happens to play; this
+# wrapper jumps there explicitly via IPC instead.
+#
+# Usage: cliamp-resume-ipc [PID_TO_WAIT]
+#   PID_TO_WAIT: keep waiting on this child (used by the headless daemon entry, so
+#   the process stays alive as long as cliamp does; the TUI path launches foot as
+#   its own job and passes nothing).
+
+set -u
+
+RESUME_FILE="${HOME}/.config/cliamp/resume.json"
+SOCK="${HOME}/.config/cliamp/cliamp.sock"
+WAIT_SECS=20
+
+# Wait for the IPC socket (cliamp may take a moment to get there)...
+for ((i = 0; i < WAIT_SECS * 10; i++)); do
+  [[ -S "$SOCK" ]] && break
+  sleep 0.1
+done
+[[ -S "$SOCK" ]] || { echo "cliamp-resume-ipc: socket never appeared" >&2; exit 1; }
+
+# v2cmd OP [PARAMS_JSON]
+# Submit an IPC operation as a job and print the job result (JSON object) on
+# success, or nothing on failure. Params are passed through as a raw JSON body.
+v2cmd() {
+  python3 - "$SOCK" "$1" "$2" <<'PY'
+import json, socket, sys, time
+
+sock, op = sys.argv[1], sys.argv[2]
+params = {}
+if len(sys.argv) > 3 and sys.argv[3]:
+    params = json.loads(sys.argv[3])
+
+def exchange(req):
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(5)
+    s.connect(sock)
+    s.sendall((json.dumps(req) + "\n").encode())
+    line = s.makefile().readline()
+    s.close()
+    return json.loads(line) if line.strip() else {}
+
+submit = exchange({"version": 2, "id": "cliamp-resume", "method": "operation.submit",
+                   "operation": op, "params": params})
+job = submit.get("job")
+if not submit.get("ok") or not job:
+    raise SystemExit(1)
+
+for _ in range(int(10 / 0.1)):
+    poll = exchange({"version": 2, "id": "cliamp-resume", "method": "job.get",
+                     "job_id": job["id"]})
+    state = (poll.get("job") or {}).get("state")
+    if state == "succeeded":
+        print(json.dumps(poll["job"].get("result") or {}))
+        raise SystemExit(0)
+    if state in ("failed", "canceled"):
+        raise SystemExit(1)
+    time.sleep(0.1)
+raise SystemExit(1)  # job.timed out
+PY
+}
+
+# Read saved state (unit-separator fields so track paths with spaces survive);
+# bail silently when there is nothing to resume. The saved playlist name is not
+# read: cliamp's headless daemon writes resume.json with an empty one
+# (daemon.saveResume passes "") and is the last writer whenever the session shuts
+# down, so requiring a match silently skipped every resume. The path lookup
+# below is the real guard — a track that is not in the playlist we launch simply
+# finds no index and jumps nowhere.
+[[ -r "$RESUME_FILE" ]] || exit 0
+state=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("path",""), d.get("position_sec",0), sep="\x1f")' "$RESUME_FILE" 2>/dev/null) || exit 0
+IFS=$'\x1f' read -r rpath rpos <<<"$state"
+[[ -n "$rpath" && "${rpos:-0}" -gt 0 ]] || exit 0
+
+# Locate the saved track in the live playlist. queue.list reports each track's
+# global index, but omits it when it is zero, so the offset plus the position in
+# the page is the fallback. Paged because a response carries at most 200 tracks
+# and a longer playlist is a real playlist.
+find_index() {
+  local offset=0 resp found total
+  while :; do
+    resp=$(v2cmd queue.list "{\"offset\":$offset,\"limit\":200}") || return 1
+    found=$(python3 - "$resp" "$rpath" "$offset" <<'PY'
+import json, sys
+r, want, offset = json.loads(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+for i, t in enumerate(r.get("tracks") or []):
+    if t.get("path") == want:
+        print(t.get("index", offset + i))
+        break
+PY
+)
+    if [[ -n "$found" ]]; then printf '%s\n' "$found"; return 0; fi
+    total=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("total") or 0)' "$resp" 2>/dev/null) || total=0
+    offset=$((offset + 200))
+    [[ $offset -lt ${total:-0} ]] || return 1
+  done
+}
+
+# A cold start loads a whole playlist before it can answer, so a single probe is
+# a race. Retry until the track turns up or the budget runs out.
+idx=""
+for _ in {1..20}; do
+  idx=$(find_index 2>/dev/null)
+  [[ -n "$idx" ]] && break
+  idx=""
+  sleep 0.5
+done
+[[ -n "$idx" ]] || exit 0  # track not in this playlist (renamed/removed)
+
+v2cmd queue.play "{\"index\":$idx}" >/dev/null || exit 0
+sleep 1  # give playback a moment to start
+
+# v2 supports absolute seeks; jump straight to the saved position.
+v2cmd seek.absolute "{\"value\":$rpos}" >/dev/null
+
+# Under the headless daemon entry the launcher stays the daemon's parent; hold
+# the line so its caller (a systemd unit or the panel) can see it as alive.
+if [[ $# -ge 1 && -n ${1:-} ]]; then wait "$1" 2>/dev/null; fi
+exit 0

@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# ExecStart for cliamp-daemon.service.
+# ExecStart for cliamp-daemon.service and the entry used by the panel's "Start
+# cliamp". Starts cliamp headless with the saved playlist, then continues the
+# last track + position the same way the terminal launcher does.
 #
 # cliamp fixes its output rate at launch and has no IPC command to change it, so the
 # only way to play a file at its native rate is to start cliamp at that rate. The panel
@@ -12,6 +14,8 @@ set -uo pipefail
 
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/cliampui"
 rate_file="$state_dir/sample-rate"
+plugin_dir="$HOME/.config/omarchy/plugins/io.github.ehlxr.cliampui"
+playlist="$("$plugin_dir/cliamp-pick-playlist")"
 
 rate=""
 if [[ -r $rate_file ]]; then
@@ -21,7 +25,12 @@ if [[ -r $rate_file ]]; then
 fi
 
 if [[ -n $rate && $rate -gt 0 ]]; then
-  exec /usr/bin/cliamp --daemon --sample-rate "$rate"
+  /usr/bin/cliamp --daemon --playlist "$playlist" --sample-rate "$rate" &
+else
+  /usr/bin/cliamp --daemon --playlist "$playlist" &
 fi
+CLIAMP_PID=$!
 
-exec /usr/bin/cliamp --daemon
+# Resume the saved track + position, then stay as the daemon's parent so a
+# supervising unit (or the panel) keeps seeing the service as alive.
+exec "$plugin_dir/cliamp-resume-ipc" "$CLIAMP_PID"

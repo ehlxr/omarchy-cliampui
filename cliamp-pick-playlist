@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+# cliamp-pick-playlist: resolve which local playlist a cliamp start (TUI or
+# daemon) should load. cliamp does not remember the last playlist, and resuming
+# only works while the saved track is already in the loaded queue, so instead of
+# hardcoding a playlist name, find the playlist that actually contains the saved
+# track from resume.json (the same file cliamp-resume-ipc uses).
+#
+# Resolution order:
+#   1. the playlist whose file contains the resume.json track path, else
+#   2. the first local playlist as a sane library default, else
+#   3. "local-pl" as the conventional fallback name.
+
+set -u
+
+playlists_dir="${CLIAMP_CONFIG_HOME:-$HOME/.config}/cliamp/playlists"
+resume_file="${HOME}/.config/cliamp/resume.json"
+
+rpath=""
+if [[ -r $resume_file ]]; then
+  rpath=$(python3 - "$resume_file" <<'PY' 2>/dev/null
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+    print(d.get("path", ""), end="")
+except Exception:
+    pass
+PY
+)
+fi
+
+if [[ -n $rpath ]]; then
+  for f in "$playlists_dir"/*.toml; do
+    [[ -e $f ]] || continue
+    if rg -q -F -- "$rpath" "$f" 2>/dev/null; then
+      basename "$f" .toml
+      exit 0
+    fi
+  done
+fi
+
+for f in "$playlists_dir"/*.toml; do
+  [[ -e $f ]] || break
+  basename "$f" .toml
+  exit 0
+done
+
+echo "local-pl"

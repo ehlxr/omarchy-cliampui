@@ -17,6 +17,10 @@ Panel {
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property bool hideWhenStopped: Model.asBool(setting("hideWhenStopped", true), true)
+  // "Close panel" pulls the widget out of the bar entirely; the next open (bar
+  // would need the icon back first, so in practice: shortcut, launcher, or IPC)
+  // puts it back.
+  property bool iconHidden: false
   readonly property color barIconColor: cliamp.isPlaying
     ? root.barForeground
     : Qt.darker(root.barForeground, 1.55)
@@ -59,6 +63,72 @@ Panel {
     updateProc.running = true
   }
 
+  // The panel is only a control surface; the player outlives it, so quitting here
+  // is a graceful SIGTERM that lets cliamp write its resume state. A TUI window
+  // closes with it; the panel stays (hideWhenStopped is off).
+  function quitCliamp() {
+    if (cliamp.running) Util.execArgv(["pkill", "-x", "cliamp"])
+  }
+
+  // 最后一行页脚的语言切换：Auto -> 中文 -> English -> Auto 循环，写的是
+  // shell.json 里本插件的 language 键（和设置面板同一个入口）。
+  function cycleLanguage() {
+    var next = root.languageSetting === "Auto"
+      ? "中文"
+      : (root.languageSetting === "中文" ? "English" : "Auto")
+    Util.execArgv(["omarchy-shell", "shell", "setBarWidget",
+      "io.github.ehlxr.cliampui", "language", JSON.stringify(next), ""])
+  }
+
+  function closeAndQuit() {
+    if (cliamp.running) Util.execArgv(["pkill", "-x", "cliamp"])
+    hideIcon()
+  }
+
+  // Every bar surface has its own instance, but an IPC route only ever lands on
+  // one, so visibility state is kept in step across all of them here. Opening
+  // pulls the icon back and shows the popup; hiding (关闭面板) does the reverse.
+  function instances() {
+    return bar && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets(moduleName) : []
+  }
+
+  function open() {
+    iconHidden = false
+    controller.show()
+    var peers = instances()
+    for (var i = 0; i < peers.length; i++) {
+      if (peers[i] !== root) { peers[i].iconHidden = false; peers[i].controller.show() }
+    }
+  }
+  function close() {
+    controller.hide()
+    var peers = instances()
+    for (var i = 0; i < peers.length; i++) {
+      if (peers[i] !== root) peers[i].controller.hide()
+    }
+  }
+  function toggle() {
+    if (iconHidden) { open(); return }
+    if (opened) close(); else open()
+  }
+  // 关闭面板：收起弹层，并且把 bar 上的插件图标也藏起来。
+  function hideIcon() {
+    iconHidden = true
+    controller.hide()
+    var peers = instances()
+    for (var i = 0; i < peers.length; i++) {
+      if (peers[i] !== root) { peers[i].iconHidden = true; peers[i].controller.hide() }
+    }
+  }
+  // 快捷键/桌面图标只会把藏起来的图标拉回来，而不展开弹层。
+  function restoreIcon() {
+    iconHidden = false
+    var peers = instances()
+    for (var i = 0; i < peers.length; i++) {
+      if (peers[i] !== root) peers[i].iconHidden = false
+    }
+  }
+
   property bool sheetOpen: false
   property bool libraryOpen: false
   property bool songListOpen: false
@@ -77,6 +147,8 @@ Panel {
   // locale is not a supported one. Localized strings reach every child through this
   // single object, and Service.verdict reads its phrase table from the same source.
   readonly property var strings: Strings.table(languageKey)
+  // 当前生效的语言名（Auto 时跟随系统地区），作为页脚切换按钮的标题。
+  readonly property string languageLabel: languageKey === "zh" ? "中文" : "English"
 
   // Ten, matching the stock panels. English is the fallback carried by Strings.js so
   // every saved setting still resolves here even before any localization ships.
@@ -97,7 +169,7 @@ Panel {
   readonly property string heroPhraseText: activePhrases[phraseIndex % activePhrases.length]
 
   // Leaves the bar entirely when there is nothing to say, rather than sitting empty.
-  visible: cliamp.running || !hideWhenStopped
+  visible: (cliamp.running || !hideWhenStopped) && !iconHidden
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -153,8 +225,11 @@ Panel {
     target: root.ipcTarget
     function open(): void { root.open() }
     function close(): void { root.close() }
+    function hide(): void { root.hideIcon() }
+    function icon(): string { root.restoreIcon(); return "shown" }
     function toggle(): void { root.toggle() }
     function start(): string { return cliamp.wakeDaemon() }
+    function quit(): string { root.quitCliamp(); return "ok" }
     function playpause(): string { cliamp.playPause(); return "ok" }
     function signal(): string { return cliamp.signalVerdict.text }
     function output(): string {
@@ -238,6 +313,7 @@ Panel {
         else if (key === "t") { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = -1 }
         else if (key === "/") { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
         else if (key === "f") cliamp.wakeDaemon()
+        else if (key === "q") root.quitCliamp()
         else if (!cliamp.running) return
         else if (key === "n") cliamp.next()
         else if (key === "b") cliamp.previous()
@@ -336,7 +412,7 @@ Panel {
           CursorSurface {
             width: parent.width
             foreground: root.foreground
-            implicitHeight: Math.max(footerVersionRow.implicitHeight, footerGithubRow.implicitHeight) + Style.spacing.rowPaddingX
+            implicitHeight: Math.max(footerVersionRow.implicitHeight, footerLangRow.implicitHeight, footerGithubRow.implicitHeight) + Style.spacing.rowPaddingX
 
             RowLayout {
               anchors.left: parent.left
@@ -356,7 +432,7 @@ Panel {
                   anchors.fill: parent
                   textFormat: Text.PlainText
                   text: String(root.strings.panelVersion || "Version") + " " + root.panelVersion
-                  color: Qt.darker(root.foreground, 1.5)
+                  color: Qt.darker(root.foreground, 1.8)
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
                   elide: Text.ElideRight
@@ -375,6 +451,82 @@ Panel {
                     fontFamily: root.fontFamily
                   }
                 }
+              }
+
+              Item {
+                id: footerCloseRow
+                implicitHeight: footerClose.implicitHeight
+                implicitWidth: footerClose.implicitWidth
+
+                Text {
+                  id: footerClose
+                  anchors.fill: parent
+                  textFormat: Text.PlainText
+                  text: String(root.strings.closeAndQuit || "Close")
+                  color: Qt.darker(root.foreground, 1.5)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  verticalAlignment: Text.AlignVCenter
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.closeAndQuit()
+
+                  PanelToolTip {
+                    visible: parent.containsMouse
+                    text: String(root.strings.closeAndQuit || "Close & Quit")
+                    fontFamily: root.fontFamily
+                  }
+                }
+              }
+
+              Text {
+                text: "·"
+                color: Qt.darker(root.foreground, 1.8)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                verticalAlignment: Text.AlignVCenter
+              }
+
+              Item {
+                id: footerLangRow
+                implicitHeight: footerLang.implicitHeight
+                implicitWidth: footerLang.implicitWidth
+
+                Text {
+                  id: footerLang
+                  anchors.fill: parent
+                  textFormat: Text.PlainText
+                  text: root.languageLabel
+                  color: Qt.darker(root.foreground, 1.5)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  verticalAlignment: Text.AlignVCenter
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.cycleLanguage()
+
+                  PanelToolTip {
+                    visible: parent.containsMouse
+                    text: String(root.strings.switchLanguage || "Switch language")
+                    fontFamily: root.fontFamily
+                  }
+                }
+              }
+
+              Text {
+                text: "·"
+                color: Qt.darker(root.foreground, 1.8)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                verticalAlignment: Text.AlignVCenter
               }
 
               Item {
