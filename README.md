@@ -1,41 +1,59 @@
 # Cliamp
 
 [cliamp](https://www.cliamp.stream/), right in the Omarchy bar: now playing with album
-art, in-panel Navidrome browsing, per-app output routing, and a bit-perfect signal
-verdict — proof the audio reaching your DAC is untouched. The transport gained four
-exclusive modes — sequential, shuffle, repeat-all and repeat-one — and the playlist
-lives in the panel, with the current track pinned on top.
-
-![Cliamp panel](docs/panel-playing.png)
+art, in-panel Navidrome browsing, output routing, and a bit-perfect signal verdict —
+proof the audio reaching your DAC is untouched. The transport gained four exclusive
+modes — sequential, shuffle, repeat-all and repeat-one — the active playlist lives in
+the panel, and lyrics resolved by cliamp itself fold under the controls. A footer
+under a hairline names the build, checks GitHub for a newer one when the version is
+clicked, and links home.
 
 The last one is the reason this exists. Nothing else on the machine can tell you that
 a 44.1 kHz track is being quietly resampled to 48 kHz before it reaches the speakers,
 which is what PipeWire does by default to everything.
 
+![Cliamp panel](docs/panel-playing.png)
+
 ## Features
 
 - **A signal verdict** that only says "bit-perfect" when it really is, and otherwise
-  names the specific thing in the way.
-- **Transport**: play, pause, previous and next centered, flanked by two
-  mutually exclusive mode buttons per side — sequential, shuffle, repeat-all and
-  repeat-one — with the active mode pill-highlighted. A scrubber hides itself for
-  radio rather than pretending a stream can be seeked.
+  names the specific thing in the way. It reads on the left of one row whose right
+  side is the output, so "where is it going" and "is it still pure" answer side by
+  side.
+- **Transport**: play, pause, previous and next centered, flanked by two mutually
+  exclusive mode buttons per side — sequential, shuffle, repeat-all and repeat-one —
+  with the active mode pill-highlighted and a tooltip on every control. A scrubber
+  hides itself for radio rather than pretending a stream can be seeked.
 - **Now playing** with album art, artist and album, straight from cliamp's MPRIS
-  interface, so it costs nothing while the panel is shut.
-- **The line being sung**, one line under the analyzer, resolved by cliamp and read off
-  the same socket. It is offset by the real output latency, so it lines up with what
-  you hear rather than with what has been decoded.
-- **Output routing** per application. Switching here moves cliamp's own stream and
-  leaves the system default alone, so your notifications keep going where they were.
-- **The current playlist in the panel**: the song list section shows the active
-  queue directly and is keyboard driven like the library. The row being played is
-  kept pinned at the top of the list, so it never scrolls out of reach while you
+  interface, so it costs nothing while the panel is shut. A ten-bar analyzer spans the
+  column underneath, drawn Winamp style as stacked LED segments with a falling peak
+  cap, fed by PipeWire's own peak data rather than a second process.
+- **Lyrics**, resolved by cliamp and shifted by the real output latency, so they line
+  up with what you hear rather than with what has been decoded. A window of lines sits
+  below the volume row with the current line large and centred while its neighbours
+  fade by distance; a three-line toggle at the end of the volume row hides them. A
+  track with no lyrics shows no line at all.
+- **Output routing** on one line: OUTPUT and its device hang at the right beside the
+  folding arrow, the verdict on the left, and the whole row opens the sink list.
+  Switching here moves cliamp's own stream and leaves the system default alone, and
+  when rate following is off a "Match rate" shortcut offers to retune the graph on the
+  spot.
+- **The current playlist in the panel**: the song list shows the active queue directly
+  and is keyboard driven like the library. A filter narrows it by title or artist and
+  keeps the queue numbers honest. The song being played is pill-highlighted and the
+  list scrolls to it on every track change, so it never scrolls out of reach while you
   pick the next track.
+- **The library is one search away**: one field searches songs, albums and saved
+  playlists, and the playlist the song list is holding reads as the picked row.
 - **Rate following**, on by default: the audio graph is retuned to the track's sample
   rate while cliamp plays, and released the moment it stops.
-- **A live level meter** driven by PipeWire's own peak data, not by a second process.
+- **A footer that answers for itself**: a hairline sets it apart from the controls.
+  The version on the left checks GitHub for updates when clicked, showing the verdict
+  in a tooltip — clicking again re-checks; the homepage link on the right opens the
+  repository. The whole interface answers in English or 中文 from the Interface
+  language setting.
 
-![The output list open on the two devices, with the one in use ticked](docs/panel-output.png)
+![The output sheet: the sink in use is ticked, the verdict on the left and the output to the right on one line](docs/panel-output.png)
 
 ## The signal line
 
@@ -73,6 +91,7 @@ back from the sink, so the panel cannot claim a route it did not get.
 | `j` / `k` / `up` / `down` | move the cursor when a list is open |
 | `h` / `l` / `left` / `right` | seek 5 seconds. Inert on a stream, where a seek would skip the track |
 | `o` | open and close the output list |
+| `t` | open and close the song list |
 | `s` | toggle shuffle between the sequential and shuffle modes |
 | `r` | cycle repeat-all, repeat-one and off |
 | `p` | toggle rate following |
@@ -80,12 +99,12 @@ back from the sink, so the panel cannot claim a route it did not get.
 | `f` | start cliamp in a terminal, only when nothing is running |
 | `esc` | close |
 
-Opening the library hands the keyboard to its search field, and while that field has
-focus the panel stops watching keys at all: every key in the table above goes to the
-field instead, so typing a name with a space or an `s` in it searches rather than
-pausing and shuffling. The field answers four keys itself: `up` and `down` move the
-cursor, enter plays the highlighted row, and `esc` hands the keyboard back to the
-panel, where a second `esc` closes it.
+Opening the library or the song list hands the keyboard to its search field, and while
+a field has focus the panel stops watching keys at all: every key in the table above
+goes to the field instead, so typing a name with a space or an `s` in it searches
+rather than pausing and shuffling. Each field answers four keys itself: `up` and
+`down` move the cursor, enter plays the highlighted row, and `esc` hands the keyboard
+back to the panel, where a second `esc` closes it.
 
 Left click opens the panel, right click plays or pauses without opening it.
 
@@ -96,6 +115,7 @@ Left click opens the panel, right click plays or pauses without opening it.
 - `omarchy-audio-sink-availability`, part of Omarchy, used to hide outputs with
   nothing plugged into them
 - `foot`, used only to start cliamp when nothing is running
+- `curl`, used by the footer's update check to ask GitHub for the latest release
 
 ## Settings
 
@@ -107,6 +127,7 @@ Left click opens the panel, right click plays or pauses without opening it.
 | Lyric timing trim in milliseconds | 0 | added on top of the measured output latency |
 | Hide the icon when cliamp is not running | on | |
 | Path to cliamp | empty | empty means find it on `PATH` |
+| Interface language | Auto | Auto follows the desktop locale; a pinned language (`English` or `中文`) keeps its strings |
 
 ## Notes worth reading once
 
@@ -152,6 +173,11 @@ they are. Artists are not a row of their own, because an artist name already bri
 up their albums and there would be nothing to play on an artist by itself. Choosing a
 song plays that one song: cliamp has no jump-to-track command, so starting its album
 from the right place is not something this can offer.
+
+**The song list filters, the library searches.** Typing in the library asks the server
+for matches, so the rows talk about what search3 found; the song list already holds the
+whole queue, so its field only narrows what is on screen by title or artist, keeping
+the numbers cliamp knows.
 
 **cliamp is only launched when nothing is running.** It allows one instance per user,
 so starting it while the daemon holds the socket would create a second, IPC-less copy
@@ -199,6 +225,13 @@ therefore lands back on the first track. Turning the setting on keeps the status
 running, one socket request per interval, so the rate follows every track change
 whether or not the panel is open. Turn it on if you play local hi-res files and want
 the last resampler out of the path.
+
+**The footer checks GitHub for updates.** The version under the hairline is this
+plugin's own build. Clicking it asks the GitHub releases API of this repository for the
+latest tag, compares it with the local build, and shows the answer in a tooltip — up to
+date, or a newer version number to click for re-check. It needs `curl` and a route to
+`api.github.com`; without either it says the check failed. The homepage link beside it
+opens the repository, and nothing in that row runs until the version is clicked.
 
 **Bluetooth can never be bit-perfect, and that is not a Linux limitation.** A2DP
 carries SBC, AAC and similar, all lossy. AirPods offer only SBC, SBC-XQ and AAC, so
@@ -268,11 +301,21 @@ Compared with that upstream `main`:
   that is polled via `job.get` instead of returning the payload directly.
 - Reworked the **transport** into four mutually exclusive mode buttons —
   sequential, shuffle, repeat-all and repeat-one — with the active mode
-  pill-highlighted.
-- Added an **in-panel song list** section that shows the active queue with the
-  now-playing row pinned at the top, keyboard driven like the library.
-- Moved the user-visible strings into `Strings.js` with a test of its own, and
-  extended the model tests for version 2 lines.
+  pill-highlighted and a tooltip on every control.
+- Kept the **playlist in the panel** as a song list that filters by title or artist,
+  keeps the real queue numbering, and scrolls to the playing song (pill-highlighted)
+  instead of pinning it at the top.
+- Added the **library to the same panel**, browsed over the published Subsonic token:
+  one search field covers songs, albums and saved playlists.
+- Merged **output and signal onto one row** — the verdict on the left, OUTPUT and its
+  device on the right beside the fold arrow — with a one-click "Match rate" shortcut
+  when the rates disagree.
+- Added **lyrics in the panel**, drawn from cliamp's own resolution, shifted by output
+  latency, with a toggle on the volume row and a large centred active line.
+- Added a **footer** under a hairline: the build version checks GitHub for updates when
+  clicked, and the homepage link opens the repository.
+- Moved the user-visible strings into `Strings.js` with English and Chinese tables and
+  a test of its own, and extended the model tests for version 2 lines.
 - Lives under the `io.github.ehlxr` namespace at manifest `0.1.14`.
 
 ## Development
@@ -283,7 +326,14 @@ Compared with that upstream `main`:
 deno run --allow-read tests/model.test.js
 ```
 
-The fixtures are lines a running cliamp actually printed, including the 88.2 kHz
+`Strings.js` likewise answers to its own suite, which checks that every key the panel
+reads exists in both languages:
+
+```bash
+deno run --allow-read tests/strings.test.js
+```
+
+The model fixtures are lines a running cliamp actually printed, including the 88.2 kHz
 substitution this machine performs.
 
 ## Support
