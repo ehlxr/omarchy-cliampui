@@ -22,7 +22,7 @@ Item {
   readonly property int activeIndex: root.service ? root.service.activeLyricIndex : -1
   readonly property string track: root.service ? root.service.lyricsTrackPath : ""
   readonly property int windowRows: 7
-  readonly property real slot: Style.space(40)
+  readonly property real slot: Style.space(30)
 
   visible: root.active
   width: parent.width
@@ -123,7 +123,7 @@ Item {
         text: row.entry ? String(row.entry.text || "") : ""
         color: root.foreground
         font.family: root.fontFamily
-        font.pixelSize: row.currentRow ? Style.space(24) : Style.space(15)
+        font.pixelSize: row.currentRow ? Style.space(17) : Style.space(12)
         font.bold: row.currentRow
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight

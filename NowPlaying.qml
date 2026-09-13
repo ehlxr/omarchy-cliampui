@@ -14,9 +14,14 @@ Column {
   property QtObject bar: null
   property var service: null
   property var strings: ({})
+  property bool lyricsVisible: true
   property string phrase: ""
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
+
+  function toggleLyrics() {
+    lyricsVisible = !lyricsVisible
+  }
 
   readonly property color dim: Qt.darker(foreground, 1.45)
   readonly property color sunken: Qt.darker(foreground, 4.2)
@@ -235,6 +240,37 @@ Column {
             font.pixelSize: Style.font.caption
             font.bold: true
           }
+
+          // The lyric toggle, right at the end of the volume row: three short lines,
+          // bright when the lyric sheet is on and dimmed when it is folded away.
+          Item {
+            id: lyricsToggle
+            Layout.preferredWidth: Style.space(18)
+            Layout.preferredHeight: Style.space(18)
+            Layout.alignment: Qt.AlignVCenter
+            visible: root.hasTrack
+            opacity: root.lyricsVisible ? 1 : 0.4
+            Behavior on opacity { NumberAnimation { duration: 160 } }
+
+            Repeater {
+              model: 3
+              Rectangle {
+                width: (index === 0 ? 0.62 : index === 1 ? 1 : 0.84) * parent.width
+                height: Style.space(2)
+                radius: height / 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: Style.space(3 + index * 4)
+                color: index === 1 && root.lyricsVisible ? Color.accent : root.foreground
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleLyrics()
+            }
+          }
         }
       }
     }
@@ -242,13 +278,15 @@ Column {
 
   // The lyric sheet, standing above the progress bar and clear of the transport
   // controls: a window of lines around the sung one, with the current line the
-  // visual centre of the whole panel. It takes no room on a track with no lyrics.
+  // visual centre of the whole panel. Hidden entirely by its toggle, and it takes
+  // no room at all on a track with no lyrics.
   LyricsView {
     width: parent.width
     bar: root.bar
     service: root.service
     foreground: root.foreground
     fontFamily: root.fontFamily
+    visible: root.lyricsVisible
   }
 
   Column {
