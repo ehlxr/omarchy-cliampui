@@ -55,32 +55,7 @@ Column {
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(10)
 
-      // Left half: the sink under OUTPUT, free to stretch to the gap.
-      PanelSectionHeader {
-        id: outputHeader
-        text: String(root.strings.sectionOutput || "OUTPUT")
-        foreground: root.foreground
-        fontFamily: root.fontFamily
-      }
-
-      Text {
-        id: summaryLabel
-        textFormat: Text.PlainText
-        Layout.fillWidth: true
-        Layout.minimumWidth: Style.space(20)
-        text: root.service && root.service.currentSinkLabel !== ""
-          ? root.service.currentSinkLabel
-          : String(root.strings.noOutput || "No output")
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
-      }
-
-      // Right half stays one tight block so the two facts read as their own column:
-      // SIGNAL and its verdict, the rate link, and the fold arrow all sit together.
-      // The verdict is reserved a share of the row and elides inside it rather than
-      // crowding the output side, and the whole block never wraps off the panel.
+      // Left half: SIGNAL and its verdict, reading as one column.
       RowLayout {
         spacing: Style.space(6)
 
@@ -91,15 +66,17 @@ Column {
           fontFamily: root.fontFamily
         }
 
+        // The verdict is reserved a share of the row and elides inside it rather than
+        // crowding the output side, and the whole block never wraps off the panel.
         Text {
           id: verdictLabel
           textFormat: Text.PlainText
           Layout.alignment: Qt.AlignRight
-          Layout.maximumWidth: root.width * 0.40
+          Layout.maximumWidth: root.width * 0.38
           text: root.verdict.text
           color: root.verdict.ok ? root.foreground : root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: Style.font.caption
           elide: Text.ElideRight
           horizontalAlignment: Text.AlignRight
         }
@@ -123,13 +100,44 @@ Column {
             onClicked: root.service.matchRate()
           }
         }
+      }
+
+      // Right half owns the fold: OUTPUT, its sink, and the arrow that folds the sink
+      // list all sit flush right, so the collapsible column reads as one unit.
+      RowLayout {
+        spacing: Style.space(6)
+        Layout.fillWidth: true
+
+        Item { Layout.fillWidth: true }
+
+        PanelSectionHeader {
+          id: outputHeader
+          text: String(root.strings.sectionOutput || "OUTPUT")
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+        }
+
+        Text {
+          id: summaryLabel
+          textFormat: Text.PlainText
+          Layout.alignment: Qt.AlignRight
+          Layout.maximumWidth: root.width * 0.40
+          text: root.service && root.service.currentSinkLabel !== ""
+            ? root.service.currentSinkLabel
+            : String(root.strings.noOutput || "No output")
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+          horizontalAlignment: Text.AlignRight
+        }
 
         Text {
           textFormat: Text.PlainText
           text: root.expanded ? "⌄" : "›"
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: Style.font.caption
         }
       }
     }
