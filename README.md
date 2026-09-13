@@ -257,6 +257,22 @@ omarchy plugin remove io.github.ehlxr.cliampui
 stream URLs carry your salted Subsonic token, so it goes with the plugin. The state
 directory holds the one shot sample rate the daemon reads at startup, and it goes too.
 
+## This is a fork
+
+Forked from [thisisgm/omarchy-cliampui](https://github.com/thisisgm/omarchy-cliampui).
+Compared with that upstream `main`:
+
+- Speaks cliamp's **version 2 IPC protocol**, where operations answer with a job
+  that is polled via `job.get` instead of returning the payload directly.
+- Reworked the **transport** into four mutually exclusive mode buttons —
+  sequential, shuffle, repeat-all and repeat-one — with the active mode
+  pill-highlighted.
+- Added an **in-panel song list** section that shows the active queue with the
+  now-playing row pinned at the top, keyboard driven like the library.
+- Moved the user-visible strings into `Strings.js` with a test of its own, and
+  extended the model tests for version 2 lines.
+- Lives under the `io.github.ehlxr` namespace at manifest `0.1.14`.
+
 ## Development
 
 `Model.js` is pure JavaScript with no QML imports, so it is covered by tests:
