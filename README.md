@@ -210,7 +210,7 @@ systemctl --user restart pipewire
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/thisisgm/omarchy-cliampui --enable
+omarchy plugin add https://github.com/ehlxr/omarchy-cliampui --enable
 omarchy bar put io.github.thisisgm.cliampui --section right
 ```
 
