@@ -20,7 +20,7 @@ Column {
 
   readonly property color dim: Qt.darker(foreground, 1.45)
   readonly property color sunken: Qt.darker(foreground, 4.2)
-  readonly property int artSize: Style.space(112)
+  readonly property int artSize: Style.space(96)
   readonly property int meterBars: 16
   readonly property real meterHeight: Style.space(14)
   readonly property bool hasTrack: !!(service && service.hasTrack)
@@ -44,7 +44,7 @@ Column {
     Rectangle {
       width: root.artSize
       height: root.artSize
-      radius: Style.space(8)
+      radius: Style.space(12)
       color: root.sunken
       clip: true
 
@@ -75,31 +75,96 @@ Column {
       spacing: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
 
-      // Title and meta are one unit and stay tight. The analyzer and the lyric are
-      // separate things and take the section rhythm from the column above.
-      Column {
+      // Title and the volume share the top line, the volume reduced to a slim
+      // strip on the right so the track name still gets the room. The volume
+      // percent only appears while dragging, which is enough feedback and keeps
+      // the header quiet.
+      RowLayout {
         width: parent.width
-        spacing: Style.space(4)
+        spacing: Style.space(8)
 
-        MarqueeText {
-          width: parent.width
-          text: root.hasTrack ? root.service.title : "Cliamp"
-          color: root.foreground
-          fontFamily: root.fontFamily
-          pixelSize: Style.font.title
-          bold: true
+        Column {
+          Layout.fillWidth: true
+          spacing: Style.space(4)
+
+          MarqueeText {
+            width: parent.width
+            text: root.hasTrack ? root.service.title : "Cliamp"
+            color: root.foreground
+            fontFamily: root.fontFamily
+            pixelSize: Style.font.title
+            bold: true
+          }
+
+          // Styled exactly as PanelHero styles its meta line, so the hero reads as stock
+          // even though the artwork is too large for PanelHero's icon slot.
+          MarqueeText {
+            width: parent.width
+            text: (root.hasTrack ? root.metaLine : root.phrase).toUpperCase()
+            color: root.dim
+            fontFamily: root.fontFamily
+            pixelSize: Style.font.caption
+            bold: true
+            letterSpacing: 1.2
+          }
         }
 
-        // Styled exactly as PanelHero styles its meta line, so the hero reads as stock
-        // even though the artwork is too large for PanelHero's icon slot.
-        MarqueeText {
-          width: parent.width
-          text: (root.hasTrack ? root.metaLine : root.phrase).toUpperCase()
-          color: root.dim
-          fontFamily: root.fontFamily
-          pixelSize: Style.font.caption
-          bold: true
-          letterSpacing: 1.2
+        CursorSurface {
+          foreground: root.foreground
+          outline: true
+          visible: !!(root.service && root.service.hasStreamVolume)
+          Layout.fillWidth: false
+          Layout.preferredWidth: Style.space(148)
+          implicitHeight: Math.max(volumeHeader.implicitHeight, volumeValue.implicitHeight, volumeSlider.implicitHeight) + Style.spacing.rowPaddingX
+
+          RowLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: Style.space(8)
+            anchors.rightMargin: Style.space(8)
+            spacing: Style.space(6)
+
+            PanelSectionHeader {
+              id: volumeHeader
+              text: String(root.strings.sectionVolume || "VOLUME")
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            PanelSlider {
+              id: volumeSlider
+              bar: root.bar
+              Layout.fillWidth: true
+              Layout.preferredHeight: Style.space(22)
+              minimum: 0
+              maximum: 100
+              step: 1
+              value: root.service ? root.service.streamVolume * 100 : 0
+              enabled: !!(root.service && root.service.running)
+
+              onMoved: function (v) { if (root.service) root.service.setStreamVolume(v / 100) }
+              // Right click returns the stream to unity and clears mute, which is the state
+              // the verdict counts as untouched. cliamp's own gain is expected to stay at 0 dB.
+              onRightClicked: if (root.service) root.service.setStreamVolume(1)
+            }
+
+            Text {
+              id: volumeValue
+              textFormat: Text.PlainText
+              text: {
+                if (!root.service) return ""
+                if (volumeSlider.dragging) return Math.round(volumeSlider.liveValue) + "%"
+                if (root.service.streamMuted) return String(root.strings.muted || "MUTED")
+                return Math.round(root.service.streamVolume * 100) + "%"
+              }
+              visible: volumeSlider.dragging || !!root.service && root.service.streamMuted
+              color: Qt.darker(root.foreground, 1.4)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
+          }
         }
       }
 
@@ -178,66 +243,18 @@ Column {
           }
         }
       }
-
-      // The volume row, where the lyric used to be: label on the left, the track
-      // stretched to the percent on the right, all on one padded, outlined surface.
-      // Percent, not dB, because this is the PipeWire stream gain and not cliamp's own.
-      CursorSurface {
-        width: parent.width
-        foreground: root.foreground
-        outline: true
-        visible: !!(root.service && root.service.hasStreamVolume)
-        implicitHeight: Math.max(volumeHeader.implicitHeight, volumeValue.implicitHeight, volumeSlider.implicitHeight) + Style.spacing.rowPaddingX
-
-        RowLayout {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.leftMargin: Style.space(10)
-          anchors.rightMargin: Style.space(10)
-          spacing: Style.space(8)
-
-          PanelSectionHeader {
-            id: volumeHeader
-            text: String(root.strings.sectionVolume || "VOLUME")
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-          }
-
-          PanelSlider {
-            id: volumeSlider
-            bar: root.bar
-            Layout.fillWidth: true
-            Layout.preferredHeight: Style.space(22)
-            minimum: 0
-            maximum: 100
-            step: 1
-            value: root.service ? root.service.streamVolume * 100 : 0
-            enabled: !!(root.service && root.service.running)
-
-            onMoved: function (v) { if (root.service) root.service.setStreamVolume(v / 100) }
-            // Right click returns the stream to unity and clears mute, which is the state
-            // the verdict counts as untouched. cliamp's own gain is expected to stay at 0 dB.
-            onRightClicked: if (root.service) root.service.setStreamVolume(1)
-          }
-
-          Text {
-            id: volumeValue
-            textFormat: Text.PlainText
-            text: {
-              if (!root.service) return ""
-              if (volumeSlider.dragging) return Math.round(volumeSlider.liveValue) + "%"
-              if (root.service.streamMuted) return String(root.strings.muted || "MUTED")
-              return Math.round(root.service.streamVolume * 100) + "%"
-            }
-            color: Qt.darker(root.foreground, 1.4)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.bold: true
-          }
-        }
-      }
     }
+  }
+
+  // The lyric sheet, standing above the progress bar and clear of the transport
+  // controls: a window of lines around the sung one, with the current line the
+  // visual centre of the whole panel. It takes no room on a track with no lyrics.
+  LyricsView {
+    width: parent.width
+    bar: root.bar
+    service: root.service
+    foreground: root.foreground
+    fontFamily: root.fontFamily
   }
 
   Column {

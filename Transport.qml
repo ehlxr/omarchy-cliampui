@@ -10,7 +10,6 @@ Column {
   property var service: null
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
-  property var strings: ({})
 
   readonly property color dim: Qt.darker(foreground, 1.4)
   readonly property bool live: !!(service && service.running)
@@ -111,26 +110,5 @@ Column {
       onActivated: if (root.service) root.service.selectMode("sequential")
       Layout.alignment: Qt.AlignVCenter
     }
-  }
-
-  // The line being sung, where the volume row used to be. cliamp resolves lyrics
-  // itself, so this draws what it already has rather than fetching anything, and it
-  // takes no room at all on a track that has none. Multi-line: long lines wrap
-  // instead of scrolling like a marquee, capped at three lines so the panel cannot
-  // grow without bound, and folded to spaces so embedded line breaks read as pauses.
-  Text {
-    id: lyric
-    width: parent.width
-    visible: root.service
-        && root.service.hasTrack
-        && String(root.service.activeLyric || "").length > 0
-    text: root.service ? String(root.service.activeLyric || "").replace(/[\r\n]+/g, " ") : ""
-    color: root.foreground
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.bodySmall
-    wrapMode: Text.Wrap
-    maximumLineCount: 3
-    elide: Text.ElideRight
-    horizontalAlignment: Text.AlignHCenter
   }
 }

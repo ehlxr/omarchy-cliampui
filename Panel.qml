@@ -242,7 +242,6 @@ Panel {
             service: cliamp
             foreground: root.foreground
             fontFamily: root.fontFamily
-            strings: root.strings
           }
 
           Library {
