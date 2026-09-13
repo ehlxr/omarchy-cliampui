@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 import qs.Commons
+import qs.Ui
 
 // The transport marks are drawn rather than typed. U+23EE, U+23ED and U+23F8 carry
 // emoji presentation, so a font stack renders them as colour glyphs that ignore the
@@ -10,6 +11,9 @@ Item {
 
   property string shape: ""
   property string glyph: ""
+  // Hover hint; left empty on controls that need no label.
+  property string tooltip: ""
+  property string fontFamily: Style.font.family
   property int size: 22
   property color color: "white"
   property bool enabled: true
@@ -127,6 +131,12 @@ Item {
     enabled: root.enabled
     cursorShape: Qt.PointingHandCursor
     onClicked: root.activated()
+  }
+
+  PanelToolTip {
+    visible: root.enabled && root.tooltip !== "" && mouse.containsMouse
+    text: root.tooltip
+    fontFamily: root.fontFamily
   }
 
   component Triangle: Shape {

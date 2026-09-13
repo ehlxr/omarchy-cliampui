@@ -10,6 +10,7 @@ Column {
   property var service: null
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
+  property var strings: ({})
 
   readonly property color dim: Qt.darker(foreground, 1.4)
   readonly property bool live: !!(service && service.running)
@@ -34,6 +35,8 @@ Column {
       size: Style.space(20)
       enabled: root.live
       selected: root.shuffling
+      tooltip: String(root.strings.toggleShuffle || "Shuffle")
+      fontFamily: root.fontFamily
       color: root.shuffling ? root.foreground : root.dim
       onActivated: if (root.service) root.service.selectMode("shuffle")
       Layout.alignment: Qt.AlignVCenter
@@ -44,6 +47,8 @@ Column {
       size: Style.space(20)
       enabled: root.live
       selected: root.onAll
+      tooltip: String(root.strings.toggleRepeatAll || "Repeat all")
+      fontFamily: root.fontFamily
       color: root.onAll ? root.foreground : root.dim
       onActivated: if (root.service) root.service.selectMode("repeatAll")
       Layout.alignment: Qt.AlignVCenter
@@ -59,6 +64,8 @@ Column {
       shape: "prev"
       size: Style.space(22)
       enabled: root.live
+      tooltip: String(root.strings.togglePrevious || "Previous")
+      fontFamily: root.fontFamily
       color: root.dim
       onActivated: root.service.previous()
       Layout.alignment: Qt.AlignVCenter
@@ -70,6 +77,8 @@ Column {
       enabled: root.live
       filled: true
       fillColor: Color.accent
+      tooltip: String(root.strings.togglePlayPause || "Play / Pause")
+      fontFamily: root.fontFamily
       // The glyph sits on the accent disc, so it takes the background colour to read.
       color: Color.background
       onActivated: root.service.playPause()
@@ -80,6 +89,8 @@ Column {
       shape: "next"
       size: Style.space(22)
       enabled: root.live
+      tooltip: String(root.strings.toggleNext || "Next")
+      fontFamily: root.fontFamily
       color: root.dim
       onActivated: root.service.next()
       Layout.alignment: Qt.AlignVCenter
@@ -96,6 +107,8 @@ Column {
       size: Style.space(20)
       enabled: root.live
       selected: root.onOne
+      tooltip: String(root.strings.toggleRepeatOne || "Repeat one")
+      fontFamily: root.fontFamily
       color: root.onOne ? root.foreground : root.dim
       onActivated: if (root.service) root.service.selectMode("repeatOne")
       Layout.alignment: Qt.AlignVCenter
@@ -106,6 +119,8 @@ Column {
       size: Style.space(20)
       enabled: root.live
       selected: root.onSequential
+      tooltip: String(root.strings.toggleSequential || "Sequential")
+      fontFamily: root.fontFamily
       color: root.onSequential ? root.foreground : root.dim
       onActivated: if (root.service) root.service.selectMode("sequential")
       Layout.alignment: Qt.AlignVCenter

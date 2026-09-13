@@ -240,6 +240,7 @@ Panel {
             width: parent.width
             bar: root.bar
             service: cliamp
+            strings: root.strings
             foreground: root.foreground
             fontFamily: root.fontFamily
           }

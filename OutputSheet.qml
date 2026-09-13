@@ -53,8 +53,9 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       anchors.leftMargin: Style.space(10)
       anchors.rightMargin: Style.space(10)
-      spacing: Style.space(8)
+      spacing: Style.space(10)
 
+      // Left half: the sink under OUTPUT, free to stretch to the gap.
       PanelSectionHeader {
         id: outputHeader
         text: String(root.strings.sectionOutput || "OUTPUT")
@@ -66,6 +67,7 @@ Column {
         id: summaryLabel
         textFormat: Text.PlainText
         Layout.fillWidth: true
+        Layout.minimumWidth: Style.space(20)
         text: root.service && root.service.currentSinkLabel !== ""
           ? root.service.currentSinkLabel
           : String(root.strings.noOutput || "No output")
@@ -75,54 +77,60 @@ Column {
         elide: Text.ElideRight
       }
 
-      PanelSectionHeader {
-        id: signalHeader
-        text: String(root.strings.sectionSignal || "SIGNAL")
-        foreground: root.foreground
-        fontFamily: root.fontFamily
-      }
+      // Right half stays one tight block so the two facts read as their own column:
+      // SIGNAL and its verdict, the rate link, and the fold arrow all sit together.
+      // The verdict is reserved a share of the row and elides inside it rather than
+      // crowding the output side, and the whole block never wraps off the panel.
+      RowLayout {
+        spacing: Style.space(6)
 
-      // The verdict sits tight to its label and yields the row to it, so a long
-      // sentence reads after the word instead of shoving the output half off screen.
-      Text {
-        id: verdictLabel
-        textFormat: Text.PlainText
-        Layout.alignment: Qt.AlignRight
-        Layout.maximumWidth: Style.space(110)
-        text: root.verdict.text
-        color: root.verdict.ok ? root.foreground : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
-        horizontalAlignment: Text.AlignRight
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        text: String(root.strings.matchRate || "Match rate")
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.underline: true
-        // Only offered when following is off, since with it on any mismatch is transient.
-        visible: !!(root.service
-          && !root.verdict.ok
-          && !root.service.followSourceRate
-          && root.service.streamRate > 0)
-
-        MouseArea {
-          anchors.fill: parent
-          cursorShape: Qt.PointingHandCursor
-          onClicked: root.service.matchRate()
+        PanelSectionHeader {
+          id: signalHeader
+          text: String(root.strings.sectionSignal || "SIGNAL")
+          foreground: root.foreground
+          fontFamily: root.fontFamily
         }
-      }
 
-      Text {
-        textFormat: Text.PlainText
-        text: root.expanded ? "⌄" : "›"
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
+        Text {
+          id: verdictLabel
+          textFormat: Text.PlainText
+          Layout.alignment: Qt.AlignRight
+          Layout.maximumWidth: root.width * 0.40
+          text: root.verdict.text
+          color: root.verdict.ok ? root.foreground : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+          horizontalAlignment: Text.AlignRight
+        }
+
+        Text {
+          textFormat: Text.PlainText
+          text: String(root.strings.matchRate || "Match rate")
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.underline: true
+          // Only offered when following is off, since with it on any mismatch is transient.
+          visible: !!(root.service
+            && !root.verdict.ok
+            && !root.service.followSourceRate
+            && root.service.streamRate > 0)
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.service.matchRate()
+          }
+        }
+
+        Text {
+          textFormat: Text.PlainText
+          text: root.expanded ? "⌄" : "›"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
       }
     }
   }

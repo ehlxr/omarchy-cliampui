@@ -270,10 +270,19 @@ Column {
             }
 
             MouseArea {
+              id: mouseLyrics
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: root.toggleLyrics()
+            }
+
+            PanelToolTip {
+              visible: mouseLyrics.containsMouse
+              text: root.lyricsVisible
+                ? String(root.strings.hideLyrics || "Hide lyrics")
+                : String(root.strings.showLyrics || "Show lyrics")
+              fontFamily: root.fontFamily
             }
           }
         }

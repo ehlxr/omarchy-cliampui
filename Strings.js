@@ -103,6 +103,15 @@ function table(key) {
     playlistsEmpty: zh ? "没有找到歌单" : "No playlists found",
     pickPlaylist: zh ? "选择歌单" : "Pick a playlist",
     playingNow: zh ? "正在播放" : "PLAYING",
+    toggleShuffle: zh ? "随机播放" : "Shuffle",
+    toggleRepeatAll: zh ? "列表循环" : "Repeat all",
+    toggleRepeatOne: zh ? "单曲循环" : "Repeat one",
+    toggleSequential: zh ? "顺序播放" : "Sequential",
+    togglePrevious: zh ? "上一首" : "Previous",
+    togglePlayPause: zh ? "播放 / 暂停" : "Play / Pause",
+    toggleNext: zh ? "下一首" : "Next",
+    showLyrics: zh ? "显示歌词" : "Show lyrics",
+    hideLyrics: zh ? "隐藏歌词" : "Hide lyrics",
     heroPhrases: zh ? ZH_PHRASES : EN_PHRASES,
     verdict: verdictPhrases(key)
   }
