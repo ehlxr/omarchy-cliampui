@@ -115,6 +115,8 @@ Left click opens the panel, right click plays or pauses without opening it.
 - `omarchy-audio-sink-availability`, part of Omarchy, used to hide outputs with
   nothing plugged into them
 - `curl`, used by the footer's update check to ask GitHub for the latest release
+- `ffmpeg`, used to pull an embedded album cover out of a local file when cliamp's
+  status does not publish one (cliamp only fills its album-art cache from the TUI)
 
 ## Settings
 
@@ -294,7 +296,9 @@ omarchy plugin remove io.github.ehlxr.cliampui
 
 `cliampui` is the scratch playlist the panel overwrites on every play, and its resolved
 stream URLs carry your salted Subsonic token, so it goes with the plugin. The state
-directory holds the one shot sample rate the daemon reads at startup, and it goes too.
+directory holds the one shot sample rate the daemon reads at startup, the covers the
+panel has extracted from local files (keyed by file, so they are not re-peeled), and it
+goes too.
 
 ## This is a fork
 

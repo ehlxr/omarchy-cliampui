@@ -55,26 +55,106 @@ Item {
   readonly property string artist: String(status.artist || (player ? player.trackArtist : "") || "")
   readonly property string album: String(status.album || (player ? player.trackAlbum : "") || "")
 
-  // cliamp publishes no mpris:artUrl for anything, local or remote, so the cover is
-  // derived from the Subsonic stream URL it does publish. The MPRIS value is still
-  // preferred in case a future release starts sending one.
+  // cliamp publishes no mpris:artUrl for anything and its status carries no art, so the
+  // cover is derived from the Subsonic stream URL it does publish, or pulled out of the
+  // local file itself (the daemon never fills cliamp's album-art cache, the TUI does).
+  // The MPRIS value is still preferred in case a future release starts sending one.
   // Held rather than recomputed to empty. The cover is derived from the stream path, so
   // any moment without a status, between tracks or while the socket changes owner,
   // would otherwise blank the artwork and flash the placeholder.
   property string artUrl: ""
   property int artSizePx: 300
+  // A cover extracted from the playing local file (see refreshLocalArt). Empty until an
+  // extraction lands, and written behind the URL sources so MPRIS and Subsonic always win.
+  property string extractedArtUrl: ""
 
   readonly property string resolvedArtUrl: {
     if (!running) return ""
     var fromMpris = player ? safeArtUrl(player.trackArtUrl) : ""
     if (fromMpris.length > 0) return fromMpris
-    return safeArtUrl(Model.coverArtUrlFromStreamPath(status.path, artSizePx))
+    var stream = safeArtUrl(Model.coverArtUrlFromStreamPath(status.path, artSizePx))
+    if (stream.length > 0) return stream
+    return root.extractedArtUrl
   }
 
   // Held only across the gap where cliamp is unreachable, which is the socket dropping
   // on a daemon restart. While it is running an empty value is the honest answer, so
   // radio and local files clear the cover instead of showing the last album played.
   onResolvedArtUrlChanged: if (running) artUrl = resolvedArtUrl
+
+  // ---- Local cover extraction ---------------------------------------------
+  // The daemon exposes neither mpris:artUrl nor any art in its snapshot, so a local
+  // track with an embedded picture would otherwise always show the placeholder. ffmpeg
+  // peels the attached image stream out into the plugin's own state directory, once per
+  // file, and the panel puts the resulting file:// URL through the same safeArtUrl gate.
+  readonly property string artExtractDir: {
+    var home = Quickshell.env("HOME") || ""
+    var state = Quickshell.env("XDG_STATE_HOME") || (home.length > 0 ? home + "/.local/state" : "")
+    return (state.length > 0 ? state : "/tmp") + "/omarchy/cliampui/album-art"
+  }
+  // The track whose extracted cover artUrl currently shows, so a new track never
+  // inherits the art of the one before it.
+  property string artTrackPath: ""
+  // The path the running (or just finished) extractor belongs to, and a path queued
+  // behind a busy extractor. cliamp cycles files on its own, so two extracts must not
+  // race; a second request waits for the first to land instead of being dropped.
+  property string artExtractFor: ""
+  property string artExtractPending: ""
+  // Files already scanned: a missing picture would otherwise be re-probed every status
+  // tick. Keyed by the exact status path.
+  property var artTried: ({})
+
+  function refreshLocalArt() {
+    var p = String(status.path || "")
+    if (artTrackPath !== p) {
+      artTrackPath = p
+      if (extractedArtUrl.length > 0) extractedArtUrl = ""
+    }
+    if (!running || !isPlaying) return
+    if (p.length === 0 || p.indexOf("://") !== -1) return
+    if (resolvedArtUrl.length > 0) return
+    if (artTried[p] === true) return
+    artTried[p] = true
+    launchArtExtract(p)
+  }
+
+  function launchArtExtract(path) {
+    if (artExtractProcess.running) { artExtractPending = path; return }
+    artExtractFor = path
+    artExtractProcess.command = [
+      "/bin/bash", "-c",
+      "d=$1; f=$2; h=$(printf '%s' \"$f\" | sha256sum | cut -d' ' -f1);"
+        + " out=\"$d/$h.jpg\"; mkdir -p \"$d\";"
+        + " [ -s \"$out\" ] && { printf '%s' \"$out\"; exit 0; };"
+        + " if command -v ffmpeg >/dev/null 2>&1; then"
+        + "   ffmpeg -v error -nostdin -i \"$f\" -map 0:v:0 -frames:v 1 -y \"$out\" >/dev/null 2>&1"
+        + "   && printf '%s' \"$out\"; fi",
+      "cliampui-art-extract", artExtractDir, path
+    ]
+    artExtractProcess.running = true
+  }
+
+  function acceptArtExtract(text) {
+    var done = String(artExtractFor || "")
+    artExtractFor = ""
+    if (done.length > 0 && done === String(status.path || "")) {
+      var p = String(text || "").trim()
+      if (p.length > 0) extractedArtUrl = "file://" + p
+    }
+    if (artExtractPending.length > 0) {
+      var queued = artExtractPending
+      artExtractPending = ""
+      if (!artExtractProcess.running) launchArtExtract(queued)
+    }
+  }
+
+  Process {
+    id: artExtractProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.acceptArtExtract(text)
+    }
+  }
 
   readonly property real lengthSec: {
     if (status.durationSec > 0) return status.durationSec
@@ -1204,6 +1284,7 @@ Item {
     if (!wantsStatus) return
     root.detectLoadedPlaylist()
     readSourceRate()
+    refreshLocalArt()
     // Nobody reads lyrics behind a shut panel, so that half stays panel only.
     if (panelOpen) refreshLyrics()
     // A load answered by pointing the queue at the row the user picked, once. This is

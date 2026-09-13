@@ -330,11 +330,13 @@ Panel {
           }
 
           // Provenance at the foot: the build on the left, the way home on the right.
-          // The version answers for updates; the homepage opens the repository.
+          // The version answers for updates; the homepage opens the repository. Each
+          // label sits inside a wrapping Item, so the hover MouseArea only ever anchors
+          // to a non-layout item (anchoring a layout child draws a WARN).
           CursorSurface {
             width: parent.width
             foreground: root.foreground
-            implicitHeight: Math.max(footerVersion.implicitHeight, footerGithub.implicitHeight) + Style.spacing.rowPaddingX
+            implicitHeight: Math.max(footerVersionRow.implicitHeight, footerGithubRow.implicitHeight) + Style.spacing.rowPaddingX
 
             RowLayout {
               anchors.left: parent.left
@@ -344,52 +346,65 @@ Panel {
               anchors.rightMargin: Style.space(10)
               spacing: Style.space(8)
 
-              Text {
-                id: footerVersion
-                textFormat: Text.PlainText
+              Item {
+                id: footerVersionRow
                 Layout.fillWidth: true
-                text: String(root.strings.panelVersion || "Version") + " " + root.panelVersion
-                color: Qt.darker(root.foreground, 1.5)
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
-              }
+                implicitHeight: footerVersion.implicitHeight
 
-              MouseArea {
-                id: versionHover
-                anchors.fill: footerVersion
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.checkForUpdates()
+                Text {
+                  id: footerVersion
+                  anchors.fill: parent
+                  textFormat: Text.PlainText
+                  text: String(root.strings.panelVersion || "Version") + " " + root.panelVersion
+                  color: Qt.darker(root.foreground, 1.5)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                  verticalAlignment: Text.AlignVCenter
+                }
 
-                PanelToolTip {
-                  visible: versionHover.containsMouse
-                  text: String(root.updateTip || root.strings.checkForUpdates || "Check for updates")
-                  fontFamily: root.fontFamily
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.checkForUpdates()
+
+                  PanelToolTip {
+                    visible: parent.containsMouse
+                    text: String(root.updateTip || root.strings.checkForUpdates || "Check for updates")
+                    fontFamily: root.fontFamily
+                  }
                 }
               }
 
-              Text {
-                id: footerGithub
-                textFormat: Text.PlainText
-                text: String(root.strings.githubLink || "Home") + " ↗"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.underline: true
-              }
+              Item {
+                id: footerGithubRow
+                implicitHeight: footerGithub.implicitHeight
+                implicitWidth: footerGithub.implicitWidth
 
-              MouseArea {
-                id: githubHover
-                anchors.fill: footerGithub
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: Util.execArgv(["xdg-open", root.projectUrl])
+                Text {
+                  id: footerGithub
+                  anchors.fill: parent
+                  textFormat: Text.PlainText
+                  text: String(root.strings.githubLink || "Home") + " ↗"
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.underline: true
+                  verticalAlignment: Text.AlignVCenter
+                }
 
-                PanelToolTip {
-                  visible: githubHover.containsMouse
-                  text: String(root.strings.visitGitHub || "Open the GitHub repository")
-                  fontFamily: root.fontFamily
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: Util.execArgv(["xdg-open", root.projectUrl])
+
+                  PanelToolTip {
+                    visible: parent.containsMouse
+                    text: String(root.strings.visitGitHub || "Open the GitHub repository")
+                    fontFamily: root.fontFamily
+                  }
                 }
               }
             }
