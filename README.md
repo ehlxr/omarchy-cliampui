@@ -96,7 +96,7 @@ back from the sink, so the panel cannot claim a route it did not get.
 | `r` | cycle repeat-all, repeat-one and off |
 | `p` | toggle rate following |
 | `/` | open the library, which puts the keyboard in the search field |
-| `f` | start cliamp in a terminal, only when nothing is running |
+| `f` | wake the headless cliamp daemon, only when nothing is running |
 | `esc` | close |
 
 Opening the library or the song list hands the keyboard to its search field, and while
@@ -114,7 +114,6 @@ Left click opens the panel, right click plays or pauses without opening it.
 - PipeWire, with `pw-metadata` and `pactl` available, both of which ship with it
 - `omarchy-audio-sink-availability`, part of Omarchy, used to hide outputs with
   nothing plugged into them
-- `foot`, used only to start cliamp when nothing is running
 - `curl`, used by the footer's update check to ask GitHub for the latest release
 
 ## Settings
@@ -179,9 +178,14 @@ for matches, so the rows talk about what search3 found; the song list already ho
 whole queue, so its field only narrows what is on screen by title or artist, keeping
 the numbers cliamp knows.
 
-**cliamp is only launched when nothing is running.** It allows one instance per user,
-so starting it while the daemon holds the socket would create a second, IPC-less copy
-this panel cannot see. The Start row therefore appears only when the socket is free.
+**Cliamp wakes headless, not in a terminal.** cliamp allows one instance per user, so
+waking it while the daemon holds the socket would create a second, IPC-less copy this
+panel cannot see. The Start row — and the `f` key — therefore appear only while the
+socket is free. They wake the headless daemon in the background: the sandboxed
+`cliamp-daemon.service` when the unit is installed, otherwise the same entry script run
+detached, which still reads the sample-rate pin the native-rate relaunch writes. The
+reconnect loop notices the socket the moment the daemon owns it, and nothing here opens
+a terminal.
 
 **Lyrics are cliamp's, not this plugin's.** cliamp resolves them from embedded tags,
 then LRCLIB, then NetEase, and answers the `lyrics` operation with a job whose result is

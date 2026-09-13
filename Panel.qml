@@ -154,6 +154,7 @@ Panel {
     function open(): void { root.open() }
     function close(): void { root.close() }
     function toggle(): void { root.toggle() }
+    function start(): string { return cliamp.wakeDaemon() }
     function playpause(): string { cliamp.playPause(); return "ok" }
     function signal(): string { return cliamp.signalVerdict.text }
     function output(): string {
@@ -212,7 +213,7 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       // Every letter is forwarded to a focused editor as well as to onTextKey, so a
-      // search for a track name would otherwise skip tracks and launch a terminal.
+      // search for a track name would otherwise skip tracks and wake the daemon.
       // The dropdown's popup owns the arrow keys while it is open, so they must not
       // also drive the panel cursor.
       blocked: library.searchFocused || songList.searchFocused
@@ -236,7 +237,7 @@ Panel {
         if (key === "o") { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
         else if (key === "t") { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = -1 }
         else if (key === "/") { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
-        else if (key === "f") cliamp.openPlayer()
+        else if (key === "f") cliamp.wakeDaemon()
         else if (!cliamp.running) return
         else if (key === "n") cliamp.next()
         else if (key === "b") cliamp.previous()

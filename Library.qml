@@ -246,8 +246,8 @@ Column {
   }
 
   // Only offered when nothing holds the socket. cliamp allows one instance per user, so
-  // launching it while the daemon runs would start a second, IPC-less copy that this
-  // panel cannot see. Browsing above removes the reason to open it at all.
+  // waking it while the daemon runs would start a second, IPC-less copy that this
+  // panel cannot see. The row wakes the headless daemon in the background — no terminal.
   CursorSurface {
     width: parent.width
     foreground: root.foreground
@@ -258,7 +258,7 @@ Column {
       anchors.fill: parent
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
-      onClicked: root.service.openPlayer()
+      onClicked: root.service.wakeDaemon()
     }
 
     RowLayout {

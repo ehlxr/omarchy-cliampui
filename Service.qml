@@ -1249,12 +1249,29 @@ Item {
     onExited: { settleTimer.restart(); root.considerNativeRate() }
   }
 
-  // No socket handover any more. cliamp allows one instance per user, so this is only
-  // ever offered when nothing owns the socket, and the in panel library removes the
-  // reason to open a terminal player at all.
-  function openPlayer() {
-    if (running) return
-    Quickshell.execDetached(["uwsm-app", "--", "foot", "--title=cliamp", cliampPath])
+  // cliamp allows one instance per user, so waking is only offered while nothing owns
+  // the socket. The sandboxed unit ships with the plugin and is preferred; without it
+  // the same entry script, which reads the sample-rate pin the native-rate relaunch
+  // writes, is run detached instead. The reconnect loop picks the daemon up as soon as
+  // it owns the socket, so nothing here needs a terminal.
+  readonly property string daemonEntryScript: String(Qt.resolvedUrl("cliamp-daemon-start")).replace("file://", "")
+
+  function wakeDaemon() {
+    if (running) return "running"
+    wakeEnableCheck.command = ["systemctl", "--user", "is-enabled", "cliamp-daemon.service"]
+    wakeEnableCheck.running = true
+    return "requested"
+  }
+
+  Process {
+    id: wakeEnableCheck
+    onExited: function (exitCode) {
+      if (exitCode === 0) {
+        Quickshell.execDetached(["systemctl", "--user", "start", "cliamp-daemon.service"])
+      } else {
+        Quickshell.execDetached(["/bin/bash", root.daemonEntryScript])
+      }
+    }
   }
 
   Process {
