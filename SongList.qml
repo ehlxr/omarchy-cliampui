@@ -64,6 +64,9 @@ Column {
   onCursorIndexChanged: if (cursorIndex >= 0) revealReal(cursorIndex)
 
   onExpandedChanged: if (root.expanded) root.scrollToCurrent()
+  // Closed while open? no. The panel reopens over the same list, so visibility is when
+  // the scroll is wanted again: the section is already expanded, nothing else changes.
+  onVisibleChanged: if (root.visible) root.scrollToCurrent()
 
   function visibleRows() {
     var rows = root.tracks
@@ -102,23 +105,30 @@ Column {
   }
 
   // The current song sits where the playlist put it; this brings it into view at its
-  // natural number rather than moving the row. Runs only when the row itself changed,
-  // never on every status tick, so the progress seconds cannot fight the scroll.
-  property int _scrolledReal: -2
+  // natural number rather than moving the row. The position lands a beat later, after
+  // the panel's open is laid out, so a view that had no size yet gets another pass.
+  property int _pendingReal: -1
   function scrollToCurrent() {
     if (!root.expanded || root.filteredRows.length === 0) return
     var real = root.realIndexOfCurrent()
-    if (real === root._scrolledReal) return
-    root._scrolledReal = real
     if (real < 0) return
-    var fi = root.filteredIndexForReal(real)
+    root._pendingReal = real
+    scrollTimer.restart()
+  }
+
+  Timer {
+    id: scrollTimer
+    interval: 110
+    repeat: false
+    onTriggered: root.applyScroll()
+  }
+
+  function applyScroll() {
+    var fi = root.filteredIndexForReal(root._pendingReal)
     if (fi >= 0) trackList.positionViewAtIndex(fi, ListView.Center)
   }
 
-  onFilterQueryChanged: {
-    root._scrolledReal = -2
-    root.scrollToCurrent()
-  }
+  onFilterQueryChanged: root.scrollToCurrent()
 
   spacing: Style.space(8)
 

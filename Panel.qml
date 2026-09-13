@@ -28,7 +28,7 @@ Panel {
   property int phraseIndex: 0
   // Cursor rows only exist while the output sheet is open, so the arrows never land
   // on a control that is not currently on screen.
-  property int cursorIndex: 0
+  property int cursorIndex: -1
 
   readonly property int phraseIntervalMs: 2800
 
@@ -123,21 +123,21 @@ Panel {
       root.sheetOpen = !root.sheetOpen
       root.libraryOpen = false
       root.songListOpen = false
-      root.cursorIndex = 0
+      root.cursorIndex = -1
       return root.sheetOpen ? "open" : "closed"
     }
     function library(): string {
       root.libraryOpen = !root.libraryOpen
       root.sheetOpen = false
       root.songListOpen = false
-      root.cursorIndex = 0
+      root.cursorIndex = -1
       return root.libraryOpen ? "open" : "closed"
     }
     function songlist(): string {
       root.songListOpen = !root.songListOpen
       root.sheetOpen = false
       root.libraryOpen = false
-      root.cursorIndex = 0
+      root.cursorIndex = -1
       return root.songListOpen ? "open" : "closed"
     }
   }
@@ -196,9 +196,9 @@ Panel {
       onTextKey: function (t) {
         var key = String(t).toLowerCase()
         // Not j, k, l, h or x: the catcher consumes those before this handler runs.
-        if (key === "o") { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
-        else if (key === "t") { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = 0 }
-        else if (key === "/") { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
+        if (key === "o") { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
+        else if (key === "t") { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = -1 }
+        else if (key === "/") { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
         else if (key === "f") cliamp.openPlayer()
         else if (!cliamp.running) return
         else if (key === "n") cliamp.next()
@@ -255,7 +255,7 @@ Panel {
             cursorIndex: root.libraryOpen ? root.cursorIndex : -1
             onMoveRequested: function (delta) { root.moveCursor(delta) }
             onActivateRequested: root.activateCursor()
-            onToggleRequested: { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
+            onToggleRequested: { root.libraryOpen = !root.libraryOpen; root.sheetOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
           }
 
           SongList {
@@ -267,7 +267,7 @@ Panel {
             expanded: root.songListOpen
             cursorIndex: root.songListOpen ? root.cursorIndex : -1
             strings: root.strings
-            onToggleRequested: { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = 0 }
+            onToggleRequested: { root.songListOpen = !root.songListOpen; root.sheetOpen = false; root.libraryOpen = false; root.cursorIndex = -1 }
             onCursorRequested: function (index) { root.cursorIndex = index }
             onMoveRequested: function (delta) { root.moveCursor(delta) }
             onActivateRequested: root.activateCursor()
@@ -281,7 +281,7 @@ Panel {
             strings: root.strings
             expanded: root.sheetOpen
             cursorIndex: root.sheetOpen ? root.cursorIndex : -1
-            onToggleRequested: { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = 0 }
+            onToggleRequested: { root.sheetOpen = !root.sheetOpen; root.libraryOpen = false; root.songListOpen = false; root.cursorIndex = -1 }
           }
         }
       }
@@ -291,7 +291,7 @@ Panel {
   onOpenedChanged: {
     if (!opened) { sheetOpen = false; libraryOpen = false; songListOpen = false; return }
     if (panelFlick) panelFlick.contentY = 0
-    cursorIndex = 0
+    cursorIndex = -1
     Qt.callLater(function () { keyCatcher.forceActiveFocus() })
   }
 }
