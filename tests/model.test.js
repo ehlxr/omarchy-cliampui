@@ -3,7 +3,7 @@
 
 const source = Deno.readTextFileSync(new URL("../Model.js", import.meta.url))
 const Model = new Function(
-  source + "; return { defaultStatus, parseStatus, parseProviderTracks, queryParam, sameTrack, rateFromNodeProps, sinkRateFromPactl, parseSinkAvailability, parsePlaylists, parseResults, matchPlaylists, messageKind, ackError, jobInfo, asBool, parseLyrics, activeLyricIndex, latencyMs, isSupportedOutputRate, parseBands, coverArtUrlFromStreamPath, transcodedFromPath, bluetoothCodecLabel, verdict, formatTime, elideError, MAX_ERROR_CHARS }"
+  source + "; return { defaultStatus, parseStatus, parseProviderTracks, queryParam, sameTrack, rateFromNodeProps, sinkRateFromPactl, parseSinkAvailability, parsePlaylists, parseResults, matchPlaylists, messageKind, ackError, jobInfo, asBool, parseLyrics, activeLyricIndex, latencyMs, isSupportedOutputRate, parseBands, coverArtUrlFromStreamPath, urlAuthority, transcodedFromPath, bluetoothCodecLabel, verdict, formatTime, elideError, MAX_ERROR_CHARS }"
 )()
 
 let failures = 0
@@ -62,6 +62,14 @@ check("cover art needs a stream url", Model.coverArtUrlFromStreamPath("http://ra
 check("cover art refuses plaintext", Model.coverArtUrlFromStreamPath("http://music.example.com/rest/stream?id=1&u=a&t=b&s=c", 300), "")
 check("cover art of a local file", Model.coverArtUrlFromStreamPath("/tmp/x.flac", 300), "")
 check("cover art of nothing", Model.coverArtUrlFromStreamPath("", 300), "")
+
+check("authority of the published stream", Model.urlAuthority(n.path), "music.example.com")
+check("authority keeps the port", Model.urlAuthority("https://music.example.com:4533/x"), "music.example.com:4533")
+check("authority lowercases the host", Model.urlAuthority("https://Music.Example.COM/rest/stream"), "music.example.com")
+check("authority of a query-only https url", Model.urlAuthority("https://music.example.com?q=1"), "music.example.com")
+check("authority refuses plaintext", Model.urlAuthority("http://music.example.com/rest/stream"), "")
+check("authority of a local file is empty", Model.urlAuthority("/tmp/x.flac"), "")
+check("authority of nothing is empty", Model.urlAuthority(""), "")
 
 check("format=raw is not transcoded", Model.transcodedFromPath(n.path), false)
 check("a missing format=raw is transcoded",

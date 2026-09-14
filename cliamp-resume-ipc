@@ -25,6 +25,26 @@ for ((i = 0; i < WAIT_SECS * 10; i++)); do
 done
 [[ -S "$SOCK" ]] || { echo "cliamp-resume-ipc: socket never appeared" >&2; exit 1; }
 
+# cliamp binds the socket 0600, and the exchange carries stream paths with salted
+# Navidrome tokens, so an impostor is a credential leak. Refuse anything that is not a
+# real, owner-only AF_UNIX socket: a symlink, a foreign owner, or group/other-visible.
+guard_socket() {
+  [[ -L "$SOCK" ]] && return 1
+  # No symlink, so -S inspects the path itself: a socket, not a fifo or plain file.
+  [[ -S "$SOCK" ]] || return 1
+  [[ "$(stat -c %u "$SOCK" 2>/dev/null)" == "$UID" ]] || return 1
+  local mode owner_only
+  mode="$(stat -c %a "$SOCK" 2>/dev/null)"
+  # Octal digits only, and nothing set for group or other (600, 700, ...).
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  owner_only=$(( 8#${mode} & 8#077 ))
+  [[ $owner_only -eq 0 ]]
+}
+guard_socket || {
+  echo "cliamp-resume-ipc: refusing an untrusted socket at $SOCK (need a 0600 socket of this user)" >&2
+  exit 1
+}
+
 # v2cmd OP [PARAMS_JSON]
 # Submit an IPC operation as a job and print the job result (JSON object) on
 # success, or nothing on failure. Params are passed through as a raw JSON body.

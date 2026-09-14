@@ -13,6 +13,9 @@
 # -C so a redirect refuses an existing path instead of following a symlink into it.
 set -Cuo pipefail
 
+# The sample-rate pin is replaced and read by the unit, so keep it owner-only.
+umask 077
+
 unit=cliamp-daemon.service
 rate="$(printf '%s' "${1:-}" | tr -cd '0-9')"
 [[ -n $rate && $rate -gt 0 ]] || exit 0

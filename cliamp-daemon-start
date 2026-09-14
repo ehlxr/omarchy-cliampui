@@ -12,6 +12,10 @@
 
 set -uo pipefail
 
+# Whatever cliamp writes from here (resume.json, its log) stays owner-only when this
+# entry runs from the panel, outside the systemd unit whose UMask=0077 covers it.
+umask 077
+
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/cliampui"
 rate_file="$state_dir/sample-rate"
 plugin_dir="$HOME/.config/omarchy/plugins/io.github.ehlxr.cliampui"

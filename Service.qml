@@ -207,11 +207,16 @@ Item {
     return null
   }
 
-  // Album art can be any string a tag supplies, so only these two schemes reach an Image.
+  // Album art can be any string a tag supplies, so only two sources reach an Image: a
+  // local extraction, or an https cover on the same server whose token already sits in
+  // the status path. The salted token never travels to a second host.
   function safeArtUrl(raw) {
     var url = String(raw || "")
     if (url.indexOf("file://") === 0) return url
-    if (url.indexOf("https://") === 0) return url
+    if (url.indexOf("https://") === 0) {
+      var authority = Model.urlAuthority(String(status.path || ""))
+      if (authority.length > 0 && authority === Model.urlAuthority(url)) return url
+    }
     return ""
   }
 
@@ -261,6 +266,9 @@ Item {
 
   // cliamp speaks newline delimited JSON on its own socket, so status needs no
   // subprocess at all. One connection replaces a spawn every couple of seconds.
+  // cliamp binds it 0600 in its own config dir (owner-only like resume.json and the
+  // log, which all carry salted Navidrome stream tokens); cliamp-resume-ipc also
+  // refuses a symlink or a group/other-visible socket before it trusts the endpoint.
   readonly property string socketPath: (Quickshell.env("HOME") || "") + "/.config/cliamp/cliamp.sock"
 
   // cliamp 2 refuses anything but a version 2 request, and echoes the id back on every

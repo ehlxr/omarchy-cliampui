@@ -195,6 +195,21 @@ function coverArtUrlFromStreamPath(path, size) {
   return base.slice(0, base.length - marker.length) + "/rest/getCoverArt?" + out.join("&")
 }
 
+// Sample input: "https://Music.Example.com:4533/rest/stream?c=cliamp" -> "music.example.com:4533"
+// The authority (host and port) of an https URL, lowercased. It is how the panel keeps
+// a cover fetch on the same server that minted the token in the status path, so the
+// salted credential never reaches a second host.
+function urlAuthority(url) {
+  var text = String(url || "")
+  if (text.indexOf("https://") !== 0) return ""
+  var rest = text.slice("https://".length)
+  var slash = rest.indexOf("/")
+  var query = rest.indexOf("?")
+  if (slash >= 0 && (query < 0 || slash < query)) rest = rest.slice(0, slash)
+  else if (query >= 0) rest = rest.slice(0, query)
+  return rest.toLowerCase()
+}
+
 // cliamp asks Navidrome for format=raw, so its absence on a Subsonic stream means
 // the server re-encoded the file before sending it.
 function transcodedFromPath(path) {

@@ -32,6 +32,10 @@ import sys
 import urllib.parse
 import urllib.request
 
+# Playlist files carry resolved stream URLs with the salted token, so every path this
+# script creates is owner-only regardless of the caller's umask.
+os.umask(0o077)
+
 # Only these carry identity and auth. format and id are rebuilt per request.
 AUTH_FIELDS = ("u", "t", "s", "c", "v")
 TIMEOUT_SEC = 8
@@ -227,7 +231,7 @@ def write_playlist(name, album, songs, host, auth):
     path = os.path.join(
         os.path.expanduser("~/.config/cliamp/playlists"), safe_name(name) + ".toml"
     )
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
 
     art = host + "/rest/getCoverArt?" + auth + "&size=600&id=" + urllib.parse.quote(
         str(album.get("coverArt") or album.get("id") or "")
