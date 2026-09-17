@@ -32,7 +32,9 @@ fi
 if [[ -n $rpath ]]; then
   for f in "$playlists_dir"/*.toml; do
     [[ -e $f ]] || continue
-    if rg -q -F -- "$rpath" "$f" 2>/dev/null; then
+    # The saved path holds a salted Navidrome token when the track streams, and
+    # /proc exposes argv, so the pattern crosses to rg on stdin (rg -f -).
+    if rg -q -F -f - -- "$f" <<<"$rpath" 2>/dev/null; then
       basename "$f" .toml
       exit 0
     fi

@@ -31,10 +31,27 @@ case "$path" in
     done
     [[ -n $kept ]] || exit 0
 
-    curl -sf --max-time 5 "$host/rest/getSong?$kept&f=json" 2>/dev/null \
-      | grep -oE '"samplingRate" *: *[0-9]+' \
-      | grep -oE '[0-9]+$' \
-      | head -1
+    # The retained t/s fields are credentials, and /proc exposes process argv, so
+    # the host and auth query cross to python on stdin and the URL is built inside
+    # it: the token never appears in an argv or the environment.
+    printf '%s\x1f%s' "$host" "$kept" | python3 -c '
+import json, sys, urllib.request
+pieces = sys.stdin.buffer.read().split(b"\x1f", 1)
+if len(pieces) != 2:
+    raise SystemExit(1)
+host, auth = pieces[0].decode("utf-8"), pieces[1].decode("utf-8")
+rate = 0
+try:
+    with urllib.request.urlopen(host + "/rest/getSong?" + auth + "&f=json", timeout=5) as response:
+        raw = response.read(1048576 + 1)
+    if len(raw) <= 1048576:
+        data = json.loads(raw.decode("utf-8", "replace"))
+        rate = ((data.get("subsonic-response") or {}).get("song") or {}).get("samplingRate") or 0
+except Exception:
+    rate = 0
+if rate:
+    print(rate)
+' 2>/dev/null | head -1
     ;;
 
   http://*|https://*)

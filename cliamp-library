@@ -39,6 +39,9 @@ os.umask(0o077)
 # Only these carry identity and auth. format and id are rebuilt per request.
 AUTH_FIELDS = ("u", "t", "s", "c", "v")
 TIMEOUT_SEC = 8
+# A menu call only ever returns metadata; anything this big is a faulty or hostile
+# server, and decoding it must not exhaust the panel helper's memory.
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 # Reused and overwritten, so a play leaves no artifact in the user's playlist list.
 SCRATCH_PLAYLIST = "cliampui"
@@ -117,12 +120,26 @@ def server_from(url):
     return host, "&".join(kept)
 
 
+def read_bounded(response):
+    """Read at most MAX_RESPONSE_BYTES. Reject an oversized Content-Length up front,
+    then read the fixed cap plus one byte and refuse the extra, so a faulty or
+    compromised server cannot exhaust the panel helper's memory."""
+    length = response.headers.get("Content-Length")
+    if length and length.isdigit() and int(length) > MAX_RESPONSE_BYTES:
+        raise ValueError("response exceeds %d bytes" % MAX_RESPONSE_BYTES)
+    raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise ValueError("response exceeds %d bytes" % MAX_RESPONSE_BYTES)
+    return raw
+
+
 def call(host, auth, endpoint, **params):
     query = auth + "&f=json&" + urllib.parse.urlencode(params)
     with urllib.request.urlopen(
         host + "/rest/" + endpoint + "?" + query, timeout=TIMEOUT_SEC
     ) as response:
-        body = json.loads(response.read().decode())
+        raw = read_bounded(response)
+    body = json.loads(raw.decode("utf-8", "replace"))
     return body.get("subsonic-response") or {}
 
 

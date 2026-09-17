@@ -103,22 +103,33 @@ IFS=$'\x1f' read -r rpath rpos <<<"$state"
 # the page is the fallback. Paged because a response carries at most 200 tracks
 # and a longer playlist is a real playlist.
 find_index() {
-  local offset=0 resp found total
+  local offset=0 resp found total both
   while :; do
     resp=$(v2cmd queue.list "{\"offset\":$offset,\"limit\":200}") || return 1
-    found=$(python3 - "$resp" "$rpath" "$offset" <<'PY'
+    # The queue response and the saved path both hold salted Navidrome tokens, and
+    # /proc exposes process argv, so they cross to python on stdin (unit separator,
+    # the same one resume.json uses), never as arguments. The offset is not secret.
+    both=$(printf '%s\x1f%s' "$rpath" "$resp" | python3 -c '
 import json, sys
-r, want, offset = json.loads(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+pieces = sys.stdin.buffer.read().split(b"\x1f", 1)
+if len(pieces) != 2:
+    raise SystemExit(1)
+want = pieces[0].decode("utf-8", "replace")
+r = json.loads(pieces[1].decode("utf-8", "replace"))
+offset = int(sys.argv[1])
+total = r.get("total") or 0
+found = ""
 for i, t in enumerate(r.get("tracks") or []):
     if t.get("path") == want:
-        print(t.get("index", offset + i))
+        found = str(t.get("index", offset + i))
         break
-PY
-)
+print(str(total) + "\x1f" + found)
+' "$offset" 2>/dev/null) || return 1
+    total="${both%%$'\x1f'*}"
+    found="${both#*$'\x1f'}"
     if [[ -n "$found" ]]; then printf '%s\n' "$found"; return 0; fi
-    total=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("total") or 0)' "$resp" 2>/dev/null) || total=0
     offset=$((offset + 200))
-    [[ $offset -lt ${total:-0} ]] || return 1
+    [[ "$total" -gt 0 && $offset -lt $total ]] || return 1
   done
 }
 
