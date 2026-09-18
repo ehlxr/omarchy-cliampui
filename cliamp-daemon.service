@@ -6,7 +6,14 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.config/omarchy/plugins/io.github.ehlxr.cliampui/cliamp-daemon-start
+# The unit is enabled, so it would survive a marketplace removal that reuses the
+# plugin checkout path. ExecStart therefore points at a guard installed outside
+# the checkout: it verifies the checkout is still the expected, user-owned
+# io.github.ehlxr.cliampui tree before exec-ing the plugin's entry point, and
+# when the checkout is missing or foreign it triggers the (never-enabled)
+# cliamp-daemon-cleanup.service, which stops, de-registers and removes this
+# owned unit. See cliamp-daemon-guard / cliamp-daemon-cleanup.
+ExecStart=%h/.local/share/omarchy/cliampui/cliamp-daemon-guard
 Restart=on-failure
 RestartSec=5
 

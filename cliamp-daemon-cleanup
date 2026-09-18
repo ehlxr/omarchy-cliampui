@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# On-demand teardown for the persistent cliamp daemon unit when its plugin
+# checkout is missing or foreign. cliamp-daemon-guard starts
+# cliamp-daemon-cleanup.service (never enabled, not wanted by anything) for this;
+# the cleanup unit is the one place that runs outside the daemon unit's sandbox,
+# which keeps home read-only, because removing our own registration writes to
+# the user's systemd dirs.
+#
+# Stops + de-registers cliamp-daemon.service, then removes the installed unit
+# and app-dir copies so that no later login or restart can execute a path that
+# the marketplace reused. The foreign checkout itself is left untouched: only
+# this plugin's owned registration is taken away.
+
+set -uo pipefail
+umask 077
+
+service_dir="${XDG_DATA_HOME:-$HOME/.local/share}/systemd/user"
+app_dir="${XDG_DATA_HOME:-$HOME/.local/share}/omarchy/cliampui"
+
+systemctl --user disable --now cliamp-daemon.service 2>/dev/null || true
+rm -f "$service_dir/cliamp-daemon.service" \
+      "$service_dir/cliamp-daemon-cleanup.service"
+rm -rf "$app_dir"
+systemctl --user daemon-reload 2>/dev/null || true

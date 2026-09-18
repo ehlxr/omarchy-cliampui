@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Authentication/persistence gate for cliamp-daemon.service.
+#
+# Enabling the shipped unit makes it start on every login, even after the
+# marketplace has removed the plugin or reused its checkout path. So the unit
+# never execs the mutable checkout directly: it execs THIS guard, which is
+# installed to a stable path outside the checkout, and the guard only hands over
+# to the plugin's real entry point when the checkout is still the expected,
+# user-owned io.github.ehlxr.cliampui tree.
+#
+# Each level is checked with lstat semantics: a symlink, a foreign owner, a
+# mismatched manifest id, or a missing/non-user-owned entry point all count as
+# "not ours". On any of those the guard asks the (never-enabled)
+# cliamp-daemon-cleanup.service to stop the service, take its enablement and the
+# installed copies away, and reload systemd, so nothing later executes the
+# reused path. Exit 0 so Restart=on-failure does not bring the de-registered
+# service back.
+
+set -uo pipefail
+umask 077
+
+want_id="io.github.ehlxr.cliampui"
+plugin_dir="$HOME/.config/omarchy/plugins/$want_id"
+manifest="$plugin_dir/manifest.json"
+entry="$plugin_dir/cliamp-daemon-start"
+
+ok=1
+[[ -d $plugin_dir && ! -L $plugin_dir && -O $plugin_dir ]]            || ok=0
+[[ "$(basename "$plugin_dir")" == "$want_id" ]]                       || ok=0
+[[ -f $manifest && ! -L $manifest && -O $manifest ]]                  || ok=0
+[[ -f $entry && ! -L $entry && -x $entry && -O $entry ]]              || ok=0
+[[ -s $manifest && $(stat -c%s "$manifest" 2>/dev/null || echo 0) -le 65536 ]] || ok=0
+if [[ $ok -eq 1 ]]; then
+  # JSON id must match exactly; a foreign id in an otherwise-present tree is a
+  # different plugin occupying our path.
+  id="$(python3 -c 'import json,sys
+try:
+    print(json.load(open(sys.argv[1])).get("id", ""))
+except Exception:
+    print("")' "$manifest" 2>/dev/null)"
+  [[ "$id" == "$want_id" ]] || ok=0
+fi
+
+if [[ $ok -ne 1 ]]; then
+  systemctl --user start cliamp-daemon-cleanup.service 2>/dev/null || true
+  exit 0
+fi
+
+exec "$entry"

@@ -1,0 +1,11 @@
+[Unit]
+Description=Stop and remove the cliamp daemon unit after its plugin checkout is gone or foreign
+# Started on demand by cliamp-daemon-guard. Never enabled and not wanted by
+# anything, so it owns no persistent registration of its own.
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/omarchy/cliampui/cliamp-daemon-cleanup
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes

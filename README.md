@@ -203,6 +203,9 @@ Then, once, point cliamp at your library and start the daemon:
 ```bash
 cliamp setup
 install -Dm644 ~/.config/omarchy/plugins/io.github.ehlxr.cliampui/cliamp-daemon.service ~/.local/share/systemd/user/cliamp-daemon.service
+install -Dm644 ~/.config/omarchy/plugins/io.github.ehlxr.cliampui/cliamp-daemon-cleanup.service ~/.local/share/systemd/user/cliamp-daemon-cleanup.service
+install -Dm755 ~/.config/omarchy/plugins/io.github.ehlxr.cliampui/cliamp-daemon-guard ~/.local/share/omarchy/cliampui/cliamp-daemon-guard
+install -Dm755 ~/.config/omarchy/plugins/io.github.ehlxr.cliampui/cliamp-daemon-cleanup ~/.local/share/omarchy/cliampui/cliamp-daemon-cleanup
 systemctl --user daemon-reload
 systemctl --user enable --now cliamp-daemon.service
 chmod -R go= ~/.config/cliamp
@@ -213,11 +216,27 @@ chmod -R go= ~/.config/cliamp
 daemon has nothing to play. The `chmod` sweeps what the unit does not: a daemon
 started from an install that predates the sandbox keeps its old file modes.
 
+The unit is enabled, so it would keep starting even if the plugin were later
+removed and its checkout path reused by something else. Its `ExecStart` is
+therefore a guard installed **outside** the plugin checkout
+(`~/.local/share/omarchy/cliampui/cliamp-daemon-guard`): before running anything
+it verifies the checkout is still the expected, user-owned
+`io.github.ehlxr.cliampui` tree (no symlinks, owner-only, `manifest.json` id
+matches). If the checkout is missing or foreign, the guard asks the
+never-enabled `cliamp-daemon-cleanup.service` to stop the service, de-register
+the unit, and remove the installed copies — so a reused path is never executed.
+Re-run the three `install` lines after any manual copy of the checkout, and
+reach `cliamp` via the enabled unit (or let the panel fall back to running the
+entry script directly).
+
 ## Removal
 
 ```bash
 systemctl --user disable --now cliamp-daemon.service
-rm -f ~/.local/share/systemd/user/cliamp-daemon.service
+systemctl --user stop cliamp-daemon-cleanup.service || true
+rm -f ~/.local/share/systemd/user/cliamp-daemon.service \
+      ~/.local/share/systemd/user/cliamp-daemon-cleanup.service
+rm -rf ~/.local/share/omarchy/cliampui
 cliamp playlist delete cliampui
 rm -rf ~/.local/state/omarchy/cliampui
 omarchy plugin remove io.github.ehlxr.cliampui

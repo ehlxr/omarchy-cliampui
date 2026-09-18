@@ -1,8 +1,10 @@
 #!/bin/bash
 
-# ExecStart for cliamp-daemon.service and the entry used by the panel's "Start
-# cliamp". Starts cliamp headless with the saved playlist, then continues the
-# last track + position the same way the terminal launcher does.
+# The real entry point behind cliamp-daemon.service (the unit execs it through
+# the cliamp-daemon-guard boundary) and the entry the panel's "Start cliamp"
+# runs directly when the unit is not enabled. Starts cliamp headless with the
+# saved playlist, then continues the last track + position the same way the
+# terminal launcher does.
 #
 # cliamp fixes its output rate at launch and has no IPC command to change it, so the
 # only way to play a file at its native rate is to start cliamp at that rate. The panel
