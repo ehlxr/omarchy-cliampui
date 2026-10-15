@@ -85,8 +85,11 @@ Panel {
   }
 
   // Every bar surface has its own instance, but an IPC route only ever lands on
-  // one, so visibility state is kept in step across all of them here. Opening
-  // pulls the icon back and shows the popup; hiding (关闭面板) does the reverse.
+  // one, so icon visibility is kept in step across all of them here. Opening
+  // pulls the icon back everywhere but shows the popup on this bar only: each
+  // popup primes Exclusive keyboard focus and lays a dismiss layer over the
+  // other outputs, so two at once fight for input and wedge the session on a
+  // multi-monitor setup. Hiding (关闭面板) still closes every instance.
   function instances() {
     return bar && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets(moduleName) : []
   }
@@ -96,7 +99,7 @@ Panel {
     controller.show()
     var peers = instances()
     for (var i = 0; i < peers.length; i++) {
-      if (peers[i] !== root) { peers[i].iconHidden = false; peers[i].controller.show() }
+      if (peers[i] !== root) peers[i].iconHidden = false
     }
   }
   function close() {

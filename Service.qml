@@ -503,8 +503,8 @@ Item {
       if (root.pendingJump && String(root.pendingJump.playlist || "") === String(root.loadedPlaylist || "")) {
         if (root.sendOperation("queue.play", { index: root.pendingJump.index })) {
           root.pendingJump = null
-          root.pendingJumpTimer.stop()
-          root.settleTimer.restart()
+          pendingJumpTimer.stop()
+          settleTimer.restart()
         }
       }
       return
@@ -512,7 +512,7 @@ Item {
     // A load that failed cannot reach the row the jump pointed at, so the jump has no
     // future here: without this the pendingJump timeout would only clear it later.
     root.pendingJump = null
-    root.pendingJumpTimer.stop()
+    pendingJumpTimer.stop()
   }
 
   // Learnt by size when the panel connects to an already-playing daemon: the loaded
@@ -640,23 +640,23 @@ Item {
     // playlist name, so "loaded" is the name learned from a load or a size match.
     if (String(root.loadedPlaylist || "") === playlist && root.total > 0) {
       root.sendOperation("queue.play", { index: row.index })
-      root.settleTimer.restart()
+      settleTimer.restart()
       return
     }
     root.pendingJump = { playlist: playlist, index: row.index }
-    root.pendingJumpTimer.restart()
+    pendingJumpTimer.restart()
     if (root.sendOperation("load", { playlist: playlist })) {
       root._loadPlaylist = playlist
-      root.settleTimer.restart()
+      settleTimer.restart()
       return
     }
     root.pendingJump = null
-    root.pendingJumpTimer.stop()
+    pendingJumpTimer.stop()
   }
 
   function clearPendingJump() {
     root.pendingJump = null
-    root.pendingJumpTimer.stop()
+    pendingJumpTimer.stop()
   }
 
   // The first playlist the panel sees on open, or the one currently loaded, becomes the
@@ -1303,8 +1303,8 @@ Item {
       if (String(root.loadedPlaylist || "") === String(root.pendingJump.playlist || "") && root.total > 0) {
         if (root.sendOperation("queue.play", { index: root.pendingJump.index })) {
           root.pendingJump = null
-          if (root.pendingJumpTimer) root.pendingJumpTimer.stop()
-          root.settleTimer.restart()
+          if (pendingJumpTimer) pendingJumpTimer.stop()
+          settleTimer.restart()
         }
       }
     }
